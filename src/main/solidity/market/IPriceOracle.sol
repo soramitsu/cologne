@@ -13,7 +13,7 @@ interface IPriceOracle {
 
     /**
      * Get exchange rate.
-     * @param token is Token1 or Token2
+     * @param token is Token1 or Token2 for amount in
      * @param amountIn to exchange
      * @return amountOut to be received on exchange
      */

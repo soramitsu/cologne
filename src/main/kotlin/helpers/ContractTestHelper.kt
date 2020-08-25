@@ -1,9 +1,6 @@
 package helpers
 
-import contract.EAUToken
-import contract.MDLYToken
-import contract.MarketAdaptorMock
-import contract.PriceOracleMock
+import contract.*
 import okhttp3.HttpUrl
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
@@ -15,34 +12,44 @@ import java.math.BigInteger
  * Creates credentials and deploy contracts
  */
 class ContractTestHelper(host: String, port: Int) {
-    var web3: Web3j = Web3j.build(
+    val web3: Web3j = Web3j.build(
         HttpService(
             HttpUrl.Builder().scheme("http").host(host).port(port).build().toString()
         )
     )
-    val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(2_500_000))
+    val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(4_500_000))
 
     // Ethereum wallets
     val credentialsAlice = Credentials.create("0x2222222222222222222222222222222222222222222222222222222222222222")
-    var credentialsBob = Credentials.create("0x3333333333333333333333333333333333333333333333333333333333333333")
+    val credentialsBob = Credentials.create("0x3333333333333333333333333333333333333333333333333333333333333333")
 
     // Contracts
-    var mdlyToken: MDLYToken
-    var eauToken: EAUToken
-    var priceOracle: PriceOracleMock
-    var marketAdaptor: MarketAdaptorMock
+    val mdlyToken: MDLYToken
+    val eauToken: EAUToken
+    val userToken: UserToken
+    val priceOracle: PriceOracleMock
+    val marketAdaptor: MarketAdaptorMock
+    val medleyDAO: MedleyDAO
 
     init {
         // Deploy contracts
-        val seedPrivateKey = "0x1111111111111111111111111111111111111111111111111111111111111111"
-        val seed = Credentials.create(seedPrivateKey)
+        val seed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
         mdlyToken = MDLYToken.deploy(web3, seed, gasProvider).send()
         eauToken = EAUToken.deploy(web3, seed, gasProvider).send()
+        userToken = UserToken.deploy(web3, seed, gasProvider).send()
         priceOracle =
             PriceOracleMock.deploy(web3, seed, gasProvider, mdlyToken.contractAddress, eauToken.contractAddress).send()
         marketAdaptor =
             MarketAdaptorMock.deploy(web3, seed, gasProvider, mdlyToken.contractAddress, eauToken.contractAddress)
                 .send()
+        medleyDAO = MedleyDAO.deploy(
+            web3,
+            seed,
+            gasProvider,
+            mdlyToken.contractAddress,
+            eauToken.contractAddress,
+            priceOracle.contractAddress
+        ).send()
     }
 
     fun addMDLY(address: String, amount: BigInteger) {
@@ -63,5 +70,33 @@ class ContractTestHelper(host: String, port: Int) {
         } else {
             throw IllegalAccessException("Wrong address - don't know credentials")
         }
+    }
+
+    /**
+     * Creates vault with owner provided by credentials
+     * @param owner - the owner of vault
+     * @param stakeAmount - stake in MDLY
+     * @param userTokenAmount - amount of user tokens
+     * @param userTokenPrice - price of user tokens in EAU
+     * @return vault address
+     */
+    fun createVault(
+        owner: Credentials,
+        stakeAmount: BigInteger,
+        userTokenAmount: BigInteger,
+        userTokenPrice: BigInteger
+    ): String {
+        userToken.mint(owner.address, userTokenAmount).send()
+        // User token by credentials
+        val tokenByOwner = UserToken.load(userToken.contractAddress, web3, owner, gasProvider)
+        tokenByOwner.approve(medleyDAO.contractAddress, userTokenAmount).send()
+
+        mdlyToken.mint(owner.address, stakeAmount).send()
+        val mdlyTokenByOwner = UserToken.load(mdlyToken.contractAddress, web3, owner, gasProvider)
+        mdlyTokenByOwner.approve(medleyDAO.contractAddress, stakeAmount).send()
+
+        val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
+        val tx = medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
+        return medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
     }
 }

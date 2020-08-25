@@ -72,7 +72,7 @@ task generateEthereumContractsBindings(type: Exec) {
             'do \n' +
             'name=$(echo "$f" | cut -f 1 -d \'.\'); \n' +
             // ignore interfaces with empty .abi content '[]'
-            'if [ $(cat ${name}.abi) != "[]" ]; then \n' +
+            'if [ "$(cat ${name}.abi)" != "[]" ]; then \n' +
             'web3j solidity generate --binFile ${name}.bin --abiFile=${name}.abi -o <generated_path> -p contract \n'
                     .replace("<bin_path>", bin_path)
                     .replace("<generated_path>", generated_path) +
