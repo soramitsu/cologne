@@ -82,13 +82,21 @@ contract Vault is IVault {
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
     function getCreditLimit() public view override returns (uint) {
-        uint loan = _calculateTotalLoan(block.timestamp);
+        uint loan = getTotalDebt(block.timestamp);
         uint totalLoan = _tokenAmount.mul(_price).div(4);
         if (totalLoan <= loan) {
             return 0;
         } else {
             return totalLoan.sub(loan);
         }
+    }
+
+    function getTotalDebt(uint time) public view override returns (uint) {
+        return _principal.add(_calculateFeesAccrued(time));
+    }
+
+    function getPrincipal() public view override returns (uint) {
+        return _principal;
     }
 
     function getPrice() public view override returns (uint) {
@@ -104,18 +112,9 @@ contract Vault is IVault {
         _collateral = _medleyDao.getMdlyPriceOracle().consult(_medleyDao.getMdlyTokenAddress(), mdlyAmount);
     }
 
-    function _calculateFeesAccrued(uint
-    //time
-    ) private pure returns (uint) {
+    function _calculateFeesAccrued(uint time) private pure returns (uint) {
         // TODO implement
         return 0;
-    }
-
-    /**
-     * Add principal to fees accrued in EAU
-     */
-    function _calculateTotalLoan(uint time) private view returns (uint) {
-        return _principal.add(_calculateFeesAccrued(time));
     }
 
     function _recordAccounting(uint recordType, uint amount, uint time) private {

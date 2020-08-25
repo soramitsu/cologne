@@ -11,6 +11,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.exceptions.TransactionException
 import java.math.BigInteger
 import java.nio.file.Path
@@ -78,7 +79,7 @@ class VaultTest {
     /**
      * @given MedleyDAO deployed owner can borrow 50 EAU
      * @when the owner borrows 50 EAU
-     * @then EAU tokens are minted to the owner account
+     * @then EAU tokens are minted to the owner account, owner debt is 50 EAU
      */
     @Test
     fun borrowSunnyDay() {
@@ -86,10 +87,14 @@ class VaultTest {
         val initialOwnerEauBalance = helper.eauToken.balanceOf(owner).send()
         val toBorrow = vault.creditLimit.send()
 
-        vault.borrow(toBorrow).send()
+        val tx = vault.borrow(toBorrow).send()
 
         assertEquals(initialEauSupply.plus(toBorrow), helper.eauToken.totalSupply().send())
         assertEquals(initialOwnerEauBalance.plus(toBorrow), helper.eauToken.balanceOf(owner).send())
+        assertEquals(toBorrow, vault.principal.send())
+        val timestamp =
+            helper.web3.ethGetBlockByNumber(DefaultBlockParameter.valueOf(tx.blockNumber), false).send().block.timestamp
+        assertEquals(toBorrow, vault.getTotalDebt(timestamp).send())
     }
 
     /**

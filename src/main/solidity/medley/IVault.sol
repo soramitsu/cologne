@@ -16,6 +16,11 @@ interface IVault {
     // Get amount of EAU the owner can borrow now
     function getCreditLimit() external view returns (uint);
 
+    // Get total debt as principal and accrued interest charge
+    function getTotalDebt(uint time) external view returns (uint);
+
+    function getPrincipal() external view returns (uint);
+
     function getPrice() external view returns (uint);
 
     function getState() external view;
