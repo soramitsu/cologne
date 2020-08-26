@@ -36,6 +36,8 @@ public class IMedleyDAO extends Contract {
 
     public static final String FUNC_GETEAUTOKENADDRESS = "getEauTokenAddress";
 
+    public static final String FUNC_GETMDLYMARKET = "getMdlyMarket";
+
     public static final String FUNC_GETMDLYPRICEORACLE = "getMdlyPriceOracle";
 
     public static final String FUNC_GETMDLYTOKENADDRESS = "getMdlyTokenAddress";
@@ -75,6 +77,13 @@ public class IMedleyDAO extends Contract {
 
     public RemoteFunctionCall<String> getEauTokenAddress() {
         final Function function = new Function(FUNC_GETEAUTOKENADDRESS, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
+        return executeRemoteCallSingleValueReturn(function, String.class);
+    }
+
+    public RemoteFunctionCall<String> getMdlyMarket() {
+        final Function function = new Function(FUNC_GETMDLYMARKET, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);

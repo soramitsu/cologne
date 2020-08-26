@@ -8,6 +8,7 @@ import "./../token/ERC20/IERC20.sol";
 import "./../token/ERC20/EAUToken.sol";
 import "./../token/ERC20/MDLYToken.sol";
 import "./../market/IPriceOracle.sol";
+import "./../market/IMarketAdaptor.sol";
 
 contract MedleyDAO is IMedleyDAO {
     address[] _vaults;
@@ -20,10 +21,13 @@ contract MedleyDAO is IMedleyDAO {
     // MDLY/DAO price feed
     IPriceOracle _mdlyPriceOracle;
 
-    constructor(address mdlyToken, address eauToken, address mdlyPriceOracle) {
+    IMarketAdaptor _mdlyMarket;
+
+    constructor(address mdlyToken, address eauToken, address mdlyPriceOracle, address mdlyMarket) {
         _mdlyToken = MDLYToken(mdlyToken);
         _eauToken = EAUToken(eauToken);
         _mdlyPriceOracle = IPriceOracle(mdlyPriceOracle);
+        _mdlyMarket = IMarketAdaptor(mdlyMarket);
     }
 
     function createVault(address token, uint stake, uint initialAmount, uint tokenPrice) external override returns (address) {
@@ -57,6 +61,10 @@ contract MedleyDAO is IMedleyDAO {
 
     function getMdlyPriceOracle() external view override returns (IPriceOracle) {
         return _mdlyPriceOracle;
+    }
+
+    function getMdlyMarket() external view override returns (IMarketAdaptor) {
+        return _mdlyMarket;
     }
 
     event VaultCreation(address indexed vault, address indexed owner);

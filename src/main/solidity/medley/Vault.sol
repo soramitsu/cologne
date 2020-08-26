@@ -3,9 +3,11 @@
 pragma solidity ^0.7.0;
 
 import "./../token/ERC20/IERC20.sol";
+import "./../token/ERC20/EAUToken.sol";
+import "./../token/ERC20/MDLYToken.sol";
 import "./IVault.sol";
 import "./IMedleyDAO.sol";
-import "../math/SafeMath.sol";
+import "./../math/SafeMath.sol";
 
 contract Vault is IVault {
     using SafeMath for uint;
@@ -26,6 +28,9 @@ contract Vault is IVault {
 
     address _owner;
 
+    EAUToken _eauToken;
+    MDLYToken _mdlyToken;
+
     // Owner ERC20 token
     IERC20 _token;
     // amount of ERC20 token the owner has deposited
@@ -44,6 +49,8 @@ contract Vault is IVault {
     constructor(address owner, uint stake, address token, uint initialAmount, uint tokenPrice) {
         _medleyDao = IMedleyDAO(msg.sender);
         _owner = owner;
+        _eauToken = EAUToken(_medleyDao.getEauTokenAddress());
+        _mdlyToken = MDLYToken(_medleyDao.getMdlyTokenAddress());
         _token = IERC20(token);
         _tokenAmount = initialAmount;
         _price = tokenPrice;
@@ -65,8 +72,23 @@ contract Vault is IVault {
     }
 
     function payOff(uint amount) public override {
-        // TODO pay off fees
-        // TODO pay off principal
+        require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
+
+        _recordAccounting(kDeposit, amount, block.timestamp);
+        _debtUpdateTime = block.timestamp;
+
+        uint leftover = _payOffFees(amount);
+
+        uint principalPaid = 0;
+        if (leftover > _principal) {
+            principalPaid = _principal;
+            leftover = leftover - _principal;
+            _principal = 0;
+        } else {
+            principalPaid = leftover;
+            _principal = _principal - leftover;
+        }
+        _eauToken.burn(principalPaid);
     }
 
     function close() public override {
@@ -107,6 +129,9 @@ contract Vault is IVault {
     function getState() public view override {
     }
 
+    function _recordAccounting(uint recordType, uint amount, uint time) private {
+        // TODO implement
+    }
 
     function _stake(uint mdlyAmount) private {
         _collateral = _medleyDao.getMdlyPriceOracle().consult(_medleyDao.getMdlyTokenAddress(), mdlyAmount);
@@ -129,8 +154,43 @@ contract Vault is IVault {
         return feeAccrued;
     }
 
-    function _recordAccounting(uint recordType, uint amount, uint time) private {
-        // TODO implement
+    /**
+     * Pay off fees accrued and distribute 50% of EAU paid and buy and burn MDLY for another 50%.
+     * @param amount - amount to pay off in EAU
+     * @return leftover - amount left after paying in EAU
+     */
+    function _payOffFees(uint amount) private returns(uint leftover) {
+        uint totalFeesAccrued = _calculateFeesAccrued(block.timestamp);
+        uint feesPaid = 0;
+        leftover = amount;
+        if (leftover > totalFeesAccrued) {
+            feesPaid = totalFeesAccrued;
+            leftover = leftover - totalFeesAccrued;
+            _feeAccrued = 0;
+        } else {
+            feesPaid = leftover;
+            _feeAccrued = totalFeesAccrued - leftover;
+            leftover = 0;
+        }
+        uint toBuyMdly = feesPaid.div(2);
+        // buy at price from oracle -10%
+        // TODO clarify price
+        uint mdlyBoughtExpected = _medleyDao.getMdlyPriceOracle().consult(address(_eauToken), toBuyMdly).mul(9).div(10);
+        address[] memory path = new address[](2);
+        path[0] = address(_eauToken);
+        path[1] = address(_mdlyToken);
+        // TODO clarify deadline
+        uint deadline = block.timestamp + 10000;
+        uint[] memory amounts = _medleyDao.getMdlyMarket().swapExactTokensForTokens(toBuyMdly, mdlyBoughtExpected, path, address(this), deadline);
+        uint mdlyBought = amounts[1];
+        require(toBuyMdly == amounts[0], "Vault::payOff(): not exact amount of EAU sold to buy MDLY");
+        require(mdlyBoughtExpected >= mdlyBought, "Vault::payOff(): MDLY bought is less than expected");
+        _mdlyToken.burn(mdlyBought);
+
+        // 50% of EAU are distributed
+        _eauToken.distribute(feesPaid - toBuyMdly);
+
+        return leftover;
     }
 }
 

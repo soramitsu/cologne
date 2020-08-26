@@ -1,7 +1,4 @@
-import contract.MDLYToken
-import contract.MedleyDAO
-import contract.UserToken
-import contract.Vault
+import contract.*
 import helpers.ContractTestHelper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -32,6 +29,7 @@ class VaultTest {
     lateinit var owner: String
     lateinit var userToken: UserToken
     lateinit var mdlyToken: MDLYToken
+    lateinit var eauToken: EAUToken
     val stake = BigInteger.valueOf(20)
     val initialAmount = BigInteger.valueOf(100)
     val tokenPrice = BigInteger.valueOf(2)
@@ -50,6 +48,9 @@ class VaultTest {
         // load MDLY token with owner credentials
         mdlyToken =
             MDLYToken.load(helper.mdlyToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+        // load EAU token with owner credentials
+        eauToken =
+            EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
     }
 
     /**
@@ -150,5 +151,32 @@ class VaultTest {
             helper.web3.ethGetBlockByNumber(DefaultBlockParameter.valueOf(tx.blockNumber), false).send().block.timestamp
         val oneYearLater = timestamp.plus(BigInteger.valueOf(31536000));
         assertEquals(BigInteger.valueOf(110276), vault.getTotalDebt(oneYearLater).send())
+    }
+
+    /**
+     * @given Vault is created and owner debt is 100'000 EAU and 0 fees accrued
+     * @when the owner pays off 50'000 EAU
+     * @then Debt is reduced to 50'000 EAU and 50'000 EAU are burnt
+     */
+    @Test
+    fun payOffDebtPartially() {
+        val initialAmount = BigInteger.valueOf(500_000)
+        val tokenPrice = BigInteger.valueOf(4)
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val debtBefore = BigInteger.valueOf(100_000)
+        val tx = vault.borrow(debtBefore).send()
+        val timestamp =
+            helper.web3.ethGetBlockByNumber(DefaultBlockParameter.valueOf(tx.blockNumber), false).send().block.timestamp
+        val toPayOff = BigInteger.valueOf(50_000)
+        val initialEauSupply = eauToken.totalSupply().send()
+        val balanceBefore = eauToken.balanceOf(owner).send()
+
+        eauToken.approve(vault.contractAddress, toPayOff).send()
+        vault.payOff(toPayOff).send()
+
+        val newDebt = vault.getTotalDebt(timestamp).send()
+        assertEquals(debtBefore.minus(toPayOff), newDebt)
+        assertEquals(initialEauSupply.minus(toPayOff), eauToken.totalSupply().send())
+        assertEquals(balanceBefore.minus(toPayOff), eauToken.balanceOf(owner).send())
     }
 }

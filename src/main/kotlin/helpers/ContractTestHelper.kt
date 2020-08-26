@@ -48,7 +48,8 @@ class ContractTestHelper(host: String, port: Int) {
             gasProvider,
             mdlyToken.contractAddress,
             eauToken.contractAddress,
-            priceOracle.contractAddress
+            priceOracle.contractAddress,
+            marketAdaptor.contractAddress
         ).send()
     }
 
