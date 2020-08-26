@@ -50,14 +50,12 @@ class VaultTest {
         // load MDLY token with owner credentials
         mdlyToken =
             MDLYToken.load(helper.mdlyToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
-
-        ownerCreatesVault()
     }
 
     /**
      * Deploy vault with Owner credentials
      */
-    fun ownerCreatesVault() {
+    fun ownerCreatesVault(initialAmount: BigInteger, tokenPrice: BigInteger) {
         val vaultAddress = helper.createVault(helper.credentialsAlice, stake, initialAmount, tokenPrice)
         vault = Vault.load(vaultAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
     }
@@ -70,6 +68,8 @@ class VaultTest {
      */
     @Test
     fun createVault() {
+        ownerCreatesVault(initialAmount, tokenPrice)
+
         assertEquals(initialAmount, userToken.balanceOf(vault.contractAddress).send())
         assertEquals(BigInteger.ZERO, userToken.balanceOf(owner).send())
         assertEquals(tokenPrice, vault.price.send())
@@ -83,6 +83,7 @@ class VaultTest {
      */
     @Test
     fun borrowSunnyDay() {
+        ownerCreatesVault(initialAmount, tokenPrice)
         val initialEauSupply = helper.eauToken.totalSupply().send()
         val initialOwnerEauBalance = helper.eauToken.balanceOf(owner).send()
         val toBorrow = vault.creditLimit.send()
@@ -104,8 +105,9 @@ class VaultTest {
      */
     @Test
     fun borrowBy3rdParty() {
+        ownerCreatesVault(initialAmount, tokenPrice)
         val stranger = helper.credentialsBob
-        val strangerVault = Vault.load(vault.contractAddress, helper.web3, helper.credentialsBob, helper.gasProvider)
+        val strangerVault = Vault.load(vault.contractAddress, helper.web3, stranger, helper.gasProvider)
         val toBorrow = BigInteger.TEN
 
         assertThrows<TransactionException> {
@@ -120,11 +122,33 @@ class VaultTest {
      */
     @Test
     fun borrowExceedsLimit() {
+        ownerCreatesVault(initialAmount, tokenPrice)
         val toBorrow = vault.creditLimit.send()
         vault.borrow(toBorrow).send()
 
         assertThrows<TransactionException> {
             vault.borrow(toBorrow).send()
         }
+    }
+
+    /**
+     * @given owner borrowed 100'000 EAU
+     * @when calculate total debt 1 year later called
+     * @then 110276 EAU returned (10276 EAU accrued as interest)
+     */
+    @Test
+    fun feesAccruedOneYearLater() {
+        val initialAmount = BigInteger.valueOf(500_000)
+        val tokenPrice = BigInteger.valueOf(4)
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val toBorrow = BigInteger.valueOf(100_000)
+
+        val tx = vault.borrow(toBorrow).send()
+
+        assertEquals(toBorrow, vault.principal.send())
+        val timestamp =
+            helper.web3.ethGetBlockByNumber(DefaultBlockParameter.valueOf(tx.blockNumber), false).send().block.timestamp
+        val oneYearLater = timestamp.plus(BigInteger.valueOf(31536000));
+        assertEquals(BigInteger.valueOf(110276), vault.getTotalDebt(oneYearLater).send())
     }
 }

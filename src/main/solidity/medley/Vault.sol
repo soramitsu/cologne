@@ -112,9 +112,21 @@ contract Vault is IVault {
         _collateral = _medleyDao.getMdlyPriceOracle().consult(_medleyDao.getMdlyTokenAddress(), mdlyAmount);
     }
 
-    function _calculateFeesAccrued(uint time) private pure returns (uint) {
-        // TODO implement
-        return 0;
+    function _calculateFeesAccrued(uint time) private view returns (uint) {
+        if (_debtUpdateTime == 0) return 0;
+        require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
+
+        // period to accrue fee in seconds (one day)
+        uint period = 86400;
+
+        // rate per period multiplied by 1'000'000
+        uint rate = uint(100000).div(365);
+
+        uint feeAccrued = _feeAccrued;
+        for (uint i = _debtUpdateTime; i < time; i = i + period) {
+            feeAccrued = feeAccrued + (_principal + feeAccrued) * rate / 1000000;
+        }
+        return feeAccrued;
     }
 
     function _recordAccounting(uint recordType, uint amount, uint time) private {
