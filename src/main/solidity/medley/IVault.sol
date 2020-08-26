@@ -3,7 +3,7 @@
 pragma solidity ^0.7.0;
 
 interface IVault {
-    function swap() external;
+    function buy(uint amount, uint maxPrice, address to) external;
 
     function borrow(uint amount) external;
 

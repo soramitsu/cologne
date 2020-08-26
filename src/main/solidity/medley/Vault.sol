@@ -46,6 +46,13 @@ contract Vault is IVault {
     uint _feeAccrued = 0;
     uint _debtUpdateTime;
 
+    bool _closed = false;
+
+    modifier notClosed {
+        require(!_closed, "Vault is closed");
+        _;
+    }
+
     constructor(address owner, uint stake, address token, uint initialAmount, uint tokenPrice) {
         _medleyDao = IMedleyDAO(msg.sender);
         _owner = owner;
@@ -57,11 +64,17 @@ contract Vault is IVault {
         _stake(stake);
     }
 
-    function swap() public override {
-        // TODO implement
+    function buy(uint amount, uint maxPrice, address to) notClosed public override {
+        require(amount <= _token.balanceOf(address(this)), "Vault::buy(): Not enough tokens to sell");
+        uint price = getPrice();
+        require(price <= maxPrice, "Vault::buy(): Price too low");
+        uint costInEau = amount * price;
+
+        payOff(costInEau);
+        require(_token.transfer(to, amount), "Vault::buy: cannot transfer EAU.");
     }
 
-    function borrow(uint amount) public override {
+    function borrow(uint amount) notClosed public override {
         require(msg.sender == _owner, "Only owner can borrow");
         require(amount <= getCreditLimit(), "Credit limit is exhausted ");
 
@@ -71,7 +84,7 @@ contract Vault is IVault {
         _recordAccounting(kWithdrowal, amount, _debtUpdateTime);
     }
 
-    function payOff(uint amount) public override {
+    function payOff(uint amount) notClosed public override {
         require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
 
         _recordAccounting(kDeposit, amount, block.timestamp);
@@ -97,13 +110,14 @@ contract Vault is IVault {
         _token.transfer(_owner, _token.balanceOf(address(this)));
         _mdlyToken.transfer(_owner, _mdlyToken.balanceOf(address(this)));
         _eauToken.transfer(_owner, _eauToken.balanceOf(address(this)));
+        _closed = true;
     }
 
-    function slash() public override {
+    function slash() notClosed public override {
     }
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
-    function getCreditLimit() public view override returns (uint) {
+    function getCreditLimit() notClosed public view override returns (uint) {
         uint loan = getTotalDebt(block.timestamp);
         uint totalLoan = _tokenAmount.mul(_price).div(4);
         if (totalLoan <= loan) {
@@ -113,11 +127,11 @@ contract Vault is IVault {
         }
     }
 
-    function getTotalDebt(uint time) public view override returns (uint) {
+    function getTotalDebt(uint time) notClosed public view override returns (uint) {
         return _principal.add(_calculateFeesAccrued(time));
     }
 
-    function getPrincipal() public view override returns (uint) {
+    function getPrincipal() notClosed public view override returns (uint) {
         return _principal;
     }
 

@@ -31,6 +31,8 @@ public class IVault extends Contract {
 
     public static final String FUNC_BORROW = "borrow";
 
+    public static final String FUNC_BUY = "buy";
+
     public static final String FUNC_CLOSE = "close";
 
     public static final String FUNC_GETCREDITLIMIT = "getCreditLimit";
@@ -46,8 +48,6 @@ public class IVault extends Contract {
     public static final String FUNC_PAYOFF = "payOff";
 
     public static final String FUNC_SLASH = "slash";
-
-    public static final String FUNC_SWAP = "swap";
 
     @Deprecated
     protected IVault(String contractAddress, Web3j web3j, Credentials credentials, BigInteger gasPrice, BigInteger gasLimit) {
@@ -71,6 +71,16 @@ public class IVault extends Contract {
         final Function function = new Function(
                 FUNC_BORROW, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.generated.Uint256(amount)), 
+                Collections.<TypeReference<?>>emptyList());
+        return executeRemoteCallTransaction(function);
+    }
+
+    public RemoteFunctionCall<TransactionReceipt> buy(BigInteger amount, BigInteger maxPrice, String to) {
+        final Function function = new Function(
+                FUNC_BUY, 
+                Arrays.<Type>asList(new org.web3j.abi.datatypes.generated.Uint256(amount), 
+                new org.web3j.abi.datatypes.generated.Uint256(maxPrice), 
+                new org.web3j.abi.datatypes.Address(160, to)), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);
     }
@@ -122,14 +132,6 @@ public class IVault extends Contract {
     public RemoteFunctionCall<TransactionReceipt> slash() {
         final Function function = new Function(
                 FUNC_SLASH, 
-                Arrays.<Type>asList(), 
-                Collections.<TypeReference<?>>emptyList());
-        return executeRemoteCallTransaction(function);
-    }
-
-    public RemoteFunctionCall<TransactionReceipt> swap() {
-        final Function function = new Function(
-                FUNC_SWAP, 
                 Arrays.<Type>asList(), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);

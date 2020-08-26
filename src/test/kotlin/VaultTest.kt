@@ -233,4 +233,27 @@ class VaultTest {
         }
     }
 
+    /**
+     * @given a vault with enough user token and a buyer with 40 EAU and price is 2 EAU/TKN
+     * @when the buyer buys 20 TKN with price at least 2 EAU/TKN
+     * @then 40 EAU go to the vault and 20 TKN go to the buyer
+     */
+    @Test
+    fun buyTokens() {
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val buyer = helper.credentialsBob
+        val buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
+        val toBuy = BigInteger.valueOf(20)
+        val costInEau = toBuy.multiply(tokenPrice)
+        eauToken.mint(buyer.address, costInEau).send()
+        val buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
+
+        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
+        buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
+
+        assertEquals(costInEau, eauToken.balanceOf(vault.contractAddress).send())
+        assertEquals(BigInteger.ZERO, eauToken.balanceOf(buyer.address).send())
+        assertEquals(initialAmount.minus(toBuy), userToken.balanceOf(vault.contractAddress).send())
+        assertEquals(toBuy, userToken.balanceOf(buyer.address).send())
+    }
 }
