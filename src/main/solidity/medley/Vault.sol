@@ -92,11 +92,11 @@ contract Vault is IVault {
     }
 
     function close() public override {
-        // TODO check if can close
-
-        // TODO transfer User Tokens to the owner
-        // TODO transfer EAU from vault to owner
-        // TODO transfer MDLY staked to the owner
+        require(msg.sender == _owner);
+        require(getTotalDebt(block.timestamp) == 0, "Vault::close(): close allowed only if debt is payed off");
+        _token.transfer(_owner, _token.balanceOf(address(this)));
+        _mdlyToken.transfer(_owner, _mdlyToken.balanceOf(address(this)));
+        _eauToken.transfer(_owner, _eauToken.balanceOf(address(this)));
     }
 
     function slash() public override {
@@ -159,7 +159,7 @@ contract Vault is IVault {
      * @param amount - amount to pay off in EAU
      * @return leftover - amount left after paying in EAU
      */
-    function _payOffFees(uint amount) private returns(uint leftover) {
+    function _payOffFees(uint amount) private returns (uint leftover) {
         uint totalFeesAccrued = _calculateFeesAccrued(block.timestamp);
         uint feesPaid = 0;
         leftover = amount;

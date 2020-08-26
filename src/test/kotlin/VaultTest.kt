@@ -179,4 +179,58 @@ class VaultTest {
         assertEquals(initialEauSupply.minus(toPayOff), eauToken.totalSupply().send())
         assertEquals(balanceBefore.minus(toPayOff), eauToken.balanceOf(owner).send())
     }
+
+    /**
+     * @given Vault deployed and has user tokens, MDLY and EAU and has no debt
+     * @when the owner closes vault
+     * @then all assets (user tokens left in vault, EAU and MDLY stake and MDLY assets transferred from the vault to the
+     * owner, vault is closed
+     */
+    @Test
+    fun closeNoDebt() {
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val eauBalance = BigInteger.valueOf(123)
+        eauToken.mint(vault.contractAddress, eauBalance).send()
+        val mdlyBalance = BigInteger.valueOf(234)
+        mdlyToken.mint(vault.contractAddress, mdlyBalance).send()
+
+        vault.close().send()
+
+        assertEquals(initialAmount, userToken.balanceOf(owner).send())
+        assertEquals(eauBalance, eauToken.balanceOf(owner).send())
+        assertEquals(mdlyBalance.add(stake), mdlyToken.balanceOf(owner).send())
+    }
+
+    /**
+     * @given a vault owner has debt
+     * @when close is called
+     * @then error response - not possilbe to close vault with debt
+     */
+    @Test
+    fun closeWithDebtNotAllowed() {
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val toBorrow = BigInteger.TEN
+        vault.borrow(toBorrow).send()
+
+        assertThrows<TransactionException> {
+            vault.close().send()
+        }
+    }
+
+    /**
+     * @given a vault and stranger account
+     * @when close is called by stranger
+     * @then error response - only owner allowed to close the vault
+     */
+    @Test
+    fun closeByStranger() {
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val stranger = helper.credentialsBob
+        val strangerVault = Vault.load(vault.contractAddress, helper.web3, stranger, helper.gasProvider)
+
+        assertThrows<TransactionException> {
+            strangerVault.close().send()
+        }
+    }
+
 }
