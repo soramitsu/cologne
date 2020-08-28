@@ -27,4 +27,6 @@ interface IMedleyDAO {
     function getMdlyPriceOracle() external view returns (IPriceOracle);
 
     function getMdlyMarket() external view returns (IMarketAdaptor);
+
+    event VaultCreation(address indexed vault, address indexed owner);
 }

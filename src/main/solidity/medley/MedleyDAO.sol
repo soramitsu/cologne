@@ -66,6 +66,4 @@ contract MedleyDAO is IMedleyDAO {
     function getMdlyMarket() external view override returns (IMarketAdaptor) {
         return _mdlyMarket;
     }
-
-    event VaultCreation(address indexed vault, address indexed owner);
 }

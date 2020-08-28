@@ -46,6 +46,9 @@ contract Vault is IVault {
     uint _feeAccrued = 0;
     uint _debtUpdateTime;
 
+    bool _limitBreached = false;
+    uint _breachTime = 0;
+
     bool _closed = false;
 
     modifier notClosed {
@@ -72,6 +75,8 @@ contract Vault is IVault {
 
         payOff(costInEau);
         require(_token.transfer(to, amount), "Vault::buy: cannot transfer EAU.");
+
+        emit Purchase(amount, price, to);
     }
 
     function borrow(uint amount) notClosed public override {
@@ -114,6 +119,7 @@ contract Vault is IVault {
     }
 
     function slash() notClosed public override {
+        // TODO implement
     }
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
@@ -127,17 +133,26 @@ contract Vault is IVault {
         }
     }
 
-    function getTotalDebt(uint time) notClosed public view override returns (uint) {
-        return _principal.add(_calculateFeesAccrued(time));
+    function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
+        (debt,) = _calculateFeesAccrued(time);
+        debt = _principal.add(debt);
+        return debt;
     }
 
     function getPrincipal() notClosed public view override returns (uint) {
         return _principal;
     }
 
-    function getPrice() public view override returns (uint) {
-        // TODO implement Dutch auction price change
-        return _price;
+    function getPrice() public view override returns (uint price) {
+        (, price) = _calculateFeesAccrued(block.timestamp);
+        return price;
+    }
+
+    /**
+     * Get MDLY collateral in EAU
+     */
+    function getCollateralInEau() public view override returns (uint) {
+        return _medleyDao.getMdlyPriceOracle().consult(_medleyDao.getMdlyTokenAddress(), _collateral);
     }
 
     function getState() public view override {
@@ -147,25 +162,57 @@ contract Vault is IVault {
         // TODO implement
     }
 
+    /**
+     * Adds MDLY to stake
+     */
     function _stake(uint mdlyAmount) private {
-        _collateral = _medleyDao.getMdlyPriceOracle().consult(_medleyDao.getMdlyTokenAddress(), mdlyAmount);
+        _collateral = _collateral + mdlyAmount;
     }
 
-    function _calculateFeesAccrued(uint time) private view returns (uint) {
-        if (_debtUpdateTime == 0) return 0;
+    /**
+     * Get price
+     * @param breachTime - time when limit was breached (0 if was not)
+     * @return price
+     */
+    function _getPrice(uint breachTime) private view returns (uint price) {
+        // 30 min
+        uint tickPriceChange = 1800;
+        price = _price;
+        if (breachTime != 0) {
+            require(block.timestamp >= breachTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
+            uint discount = ((block.timestamp.sub(breachTime)).div(tickPriceChange));
+            discount = discount % 101;
+            price = price.mul(100 - discount).div(100);
+        }
+        return price;
+    }
+
+    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint price) {
+        if (_debtUpdateTime == 0) return (0, _price);
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
 
         // period to accrue fee in seconds (one day)
         uint period = 86400;
 
+        // TODO calculate rate accrording the table
         // rate per period multiplied by 1'000'000
         uint rate = uint(100000).div(365);
 
-        uint feeAccrued = _feeAccrued;
+        uint breachTime = 0;
+        price = _getPrice(breachTime);
+        feeAccrued = _feeAccrued;
         for (uint i = _debtUpdateTime; i < time; i = i + period) {
+            uint limit = _tokenAmount.mul(price).div(4);
+            // limit has been breached
+            if (_principal.add(feeAccrued) > limit) {
+                if (breachTime == 0) {
+                    breachTime = i;
+                }
+                price = _getPrice(breachTime);
+            }
             feeAccrued = feeAccrued + (_principal + feeAccrued) * rate / 1000000;
         }
-        return feeAccrued;
+        return (feeAccrued, price);
     }
 
     /**
@@ -174,7 +221,8 @@ contract Vault is IVault {
      * @return leftover - amount left after paying in EAU
      */
     function _payOffFees(uint amount) private returns (uint leftover) {
-        uint totalFeesAccrued = _calculateFeesAccrued(block.timestamp);
+        uint totalFeesAccrued;
+        (totalFeesAccrued,) = _calculateFeesAccrued(block.timestamp);
         uint feesPaid = 0;
         leftover = amount;
         if (leftover > totalFeesAccrued) {
@@ -193,7 +241,7 @@ contract Vault is IVault {
         address[] memory path = new address[](2);
         path[0] = address(_eauToken);
         path[1] = address(_mdlyToken);
-        // TODO clarify deadline
+        // TODO clarify deadline for Uniswap
         uint deadline = block.timestamp + 10000;
         uint[] memory amounts = _medleyDao.getMdlyMarket().swapExactTokensForTokens(toBuyMdly, mdlyBoughtExpected, path, address(this), deadline);
         uint mdlyBought = amounts[1];

@@ -23,6 +23,9 @@ interface IVault {
 
     function getPrice() external view returns (uint);
 
+    function getCollateralInEau() external view returns(uint);
+
     function getState() external view;
 
+    event Purchase(uint amount, uint indexed price, address indexed to);
 }

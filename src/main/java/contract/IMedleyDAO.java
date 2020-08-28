@@ -1,19 +1,27 @@
 package contract;
 
+import io.reactivex.Flowable;
+import io.reactivex.functions.Function;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
+import org.web3j.abi.EventEncoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.DynamicArray;
-import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Event;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.RemoteCall;
 import org.web3j.protocol.core.RemoteFunctionCall;
+import org.web3j.protocol.core.methods.request.EthFilter;
+import org.web3j.protocol.core.methods.response.BaseEventResponse;
+import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.tx.Contract;
 import org.web3j.tx.TransactionManager;
@@ -46,6 +54,10 @@ public class IMedleyDAO extends Contract {
 
     public static final String FUNC_MINTEAU = "mintEAU";
 
+    public static final Event VAULTCREATION_EVENT = new Event("VaultCreation", 
+            Arrays.<TypeReference<?>>asList(new TypeReference<Address>(true) {}, new TypeReference<Address>(true) {}));
+    ;
+
     @Deprecated
     protected IMedleyDAO(String contractAddress, Web3j web3j, Credentials credentials, BigInteger gasPrice, BigInteger gasLimit) {
         super(BINARY, contractAddress, web3j, credentials, gasPrice, gasLimit);
@@ -64,8 +76,41 @@ public class IMedleyDAO extends Contract {
         super(BINARY, contractAddress, web3j, transactionManager, contractGasProvider);
     }
 
+    public List<VaultCreationEventResponse> getVaultCreationEvents(TransactionReceipt transactionReceipt) {
+        List<Contract.EventValuesWithLog> valueList = extractEventParametersWithLog(VAULTCREATION_EVENT, transactionReceipt);
+        ArrayList<VaultCreationEventResponse> responses = new ArrayList<VaultCreationEventResponse>(valueList.size());
+        for (Contract.EventValuesWithLog eventValues : valueList) {
+            VaultCreationEventResponse typedResponse = new VaultCreationEventResponse();
+            typedResponse.log = eventValues.getLog();
+            typedResponse.vault = (String) eventValues.getIndexedValues().get(0).getValue();
+            typedResponse.owner = (String) eventValues.getIndexedValues().get(1).getValue();
+            responses.add(typedResponse);
+        }
+        return responses;
+    }
+
+    public Flowable<VaultCreationEventResponse> vaultCreationEventFlowable(EthFilter filter) {
+        return web3j.ethLogFlowable(filter).map(new Function<Log, VaultCreationEventResponse>() {
+            @Override
+            public VaultCreationEventResponse apply(Log log) {
+                Contract.EventValuesWithLog eventValues = extractEventParametersWithLog(VAULTCREATION_EVENT, log);
+                VaultCreationEventResponse typedResponse = new VaultCreationEventResponse();
+                typedResponse.log = log;
+                typedResponse.vault = (String) eventValues.getIndexedValues().get(0).getValue();
+                typedResponse.owner = (String) eventValues.getIndexedValues().get(1).getValue();
+                return typedResponse;
+            }
+        });
+    }
+
+    public Flowable<VaultCreationEventResponse> vaultCreationEventFlowable(DefaultBlockParameter startBlock, DefaultBlockParameter endBlock) {
+        EthFilter filter = new EthFilter(startBlock, endBlock, getContractAddress());
+        filter.addSingleTopic(EventEncoder.encode(VAULTCREATION_EVENT));
+        return vaultCreationEventFlowable(filter);
+    }
+
     public RemoteFunctionCall<TransactionReceipt> createVault(String token, BigInteger stake, BigInteger initialAmount, BigInteger tokenPrice) {
-        final Function function = new Function(
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_CREATEVAULT, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, token), 
                 new org.web3j.abi.datatypes.generated.Uint256(stake), 
@@ -76,35 +121,35 @@ public class IMedleyDAO extends Contract {
     }
 
     public RemoteFunctionCall<String> getEauTokenAddress() {
-        final Function function = new Function(FUNC_GETEAUTOKENADDRESS, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETEAUTOKENADDRESS, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);
     }
 
     public RemoteFunctionCall<String> getMdlyMarket() {
-        final Function function = new Function(FUNC_GETMDLYMARKET, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETMDLYMARKET, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);
     }
 
     public RemoteFunctionCall<String> getMdlyPriceOracle() {
-        final Function function = new Function(FUNC_GETMDLYPRICEORACLE, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETMDLYPRICEORACLE, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);
     }
 
     public RemoteFunctionCall<String> getMdlyTokenAddress() {
-        final Function function = new Function(FUNC_GETMDLYTOKENADDRESS, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETMDLYTOKENADDRESS, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);
     }
 
     public RemoteFunctionCall<List> listVaults() {
-        final Function function = new Function(FUNC_LISTVAULTS, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_LISTVAULTS, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicArray<Address>>() {}));
         return new RemoteFunctionCall<List>(function,
@@ -119,7 +164,7 @@ public class IMedleyDAO extends Contract {
     }
 
     public RemoteFunctionCall<TransactionReceipt> mintEAU(String beneficiary, BigInteger amount) {
-        final Function function = new Function(
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_MINTEAU, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, beneficiary), 
                 new org.web3j.abi.datatypes.generated.Uint256(amount)), 
@@ -161,5 +206,11 @@ public class IMedleyDAO extends Contract {
     @Deprecated
     public static RemoteCall<IMedleyDAO> deploy(Web3j web3j, TransactionManager transactionManager, BigInteger gasPrice, BigInteger gasLimit) {
         return deployRemoteCall(IMedleyDAO.class, web3j, transactionManager, gasPrice, gasLimit, BINARY, "");
+    }
+
+    public static class VaultCreationEventResponse extends BaseEventResponse {
+        public String vault;
+
+        public String owner;
     }
 }
