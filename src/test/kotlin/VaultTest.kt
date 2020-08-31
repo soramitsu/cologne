@@ -144,12 +144,12 @@ class VaultTest {
         ownerCreatesVault(initialAmount, tokenPrice)
         val toBorrow = BigInteger.valueOf(100_000)
 
-        val tx = vault.borrow(toBorrow).send()
+        vault.borrow(toBorrow).send()
 
         assertEquals(toBorrow, vault.principal.send())
-        val timestamp =
-            helper.web3.ethGetBlockByNumber(DefaultBlockParameter.valueOf(tx.blockNumber), false).send().block.timestamp
+        val timestamp = helper.timeProvider.time.send()
         val oneYearLater = timestamp.plus(BigInteger.valueOf(31536000));
+        helper.timeProvider.setTime(timestamp)
         assertEquals(BigInteger.valueOf(110276), vault.getTotalDebt(oneYearLater).send())
     }
 
@@ -164,9 +164,8 @@ class VaultTest {
         val tokenPrice = BigInteger.valueOf(4)
         ownerCreatesVault(initialAmount, tokenPrice)
         val debtBefore = BigInteger.valueOf(100_000)
-        val tx = vault.borrow(debtBefore).send()
-        val timestamp =
-            helper.web3.ethGetBlockByNumber(DefaultBlockParameter.valueOf(tx.blockNumber), false).send().block.timestamp
+        vault.borrow(debtBefore).send()
+        val timestamp = helper.timeProvider.time.send()
         val toPayOff = BigInteger.valueOf(50_000)
         val initialEauSupply = eauToken.totalSupply().send()
         val balanceBefore = eauToken.balanceOf(owner).send()

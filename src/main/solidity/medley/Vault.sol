@@ -8,6 +8,7 @@ import "./../token/ERC20/MDLYToken.sol";
 import "./IVault.sol";
 import "./IMedleyDAO.sol";
 import "./../math/SafeMath.sol";
+import "./ITimeProvider.sol";
 
 contract Vault is IVault {
     using SafeMath for uint;
@@ -51,12 +52,14 @@ contract Vault is IVault {
 
     bool _closed = false;
 
+    ITimeProvider _timeProvider;
+
     modifier notClosed {
         require(!_closed, "Vault is closed");
         _;
     }
 
-    constructor(address owner, uint stake, address token, uint initialAmount, uint tokenPrice) {
+    constructor(address owner, uint stake, address token, uint initialAmount, uint tokenPrice, ITimeProvider timeProvider) {
         _medleyDao = IMedleyDAO(msg.sender);
         _owner = owner;
         _eauToken = EAUToken(_medleyDao.getEauTokenAddress());
@@ -64,6 +67,8 @@ contract Vault is IVault {
         _token = IERC20(token);
         _tokenAmount = initialAmount;
         _price = tokenPrice;
+        _timeProvider = timeProvider;
+        _debtUpdateTime = _timeProvider.getTime();
         _stake(stake);
     }
 
@@ -85,15 +90,15 @@ contract Vault is IVault {
 
         _medleyDao.mintEAU(_owner, amount);
         _principal += amount;
-        _debtUpdateTime = block.timestamp;
+        _debtUpdateTime = _timeProvider.getTime();
         _recordAccounting(kWithdrowal, amount, _debtUpdateTime);
     }
 
     function payOff(uint amount) notClosed public override {
         require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
 
-        _recordAccounting(kDeposit, amount, block.timestamp);
-        _debtUpdateTime = block.timestamp;
+        _recordAccounting(kDeposit, amount, _timeProvider.getTime());
+        _debtUpdateTime = _timeProvider.getTime();
 
         uint leftover = _payOffFees(amount);
 
@@ -111,7 +116,7 @@ contract Vault is IVault {
 
     function close() public override {
         require(msg.sender == _owner);
-        require(getTotalDebt(block.timestamp) == 0, "Vault::close(): close allowed only if debt is payed off");
+        require(getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is payed off");
         _token.transfer(_owner, _token.balanceOf(address(this)));
         _mdlyToken.transfer(_owner, _mdlyToken.balanceOf(address(this)));
         _eauToken.transfer(_owner, _eauToken.balanceOf(address(this)));
@@ -124,7 +129,7 @@ contract Vault is IVault {
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
     function getCreditLimit() notClosed public view override returns (uint) {
-        uint loan = getTotalDebt(block.timestamp);
+        uint loan = getTotalDebt(_timeProvider.getTime());
         uint totalLoan = _tokenAmount.mul(_price).div(4);
         if (totalLoan <= loan) {
             return 0;
@@ -144,7 +149,7 @@ contract Vault is IVault {
     }
 
     function getPrice() public view override returns (uint price) {
-        (, price) = _calculateFeesAccrued(block.timestamp);
+        (, price) = _calculateFeesAccrued(_timeProvider.getTime());
         return price;
     }
 
@@ -179,8 +184,8 @@ contract Vault is IVault {
         uint tickPriceChange = 1800;
         price = _price;
         if (breachTime != 0) {
-            require(block.timestamp >= breachTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
-            uint discount = ((block.timestamp.sub(breachTime)).div(tickPriceChange));
+            require(_timeProvider.getTime() >= breachTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
+            uint discount = ((_timeProvider.getTime().sub(breachTime)).div(tickPriceChange));
             discount = discount % 101;
             price = price.mul(100 - discount).div(100);
         }
@@ -188,7 +193,6 @@ contract Vault is IVault {
     }
 
     function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint price) {
-        if (_debtUpdateTime == 0) return (0, _price);
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
 
         // period to accrue fee in seconds (one day)
@@ -222,7 +226,7 @@ contract Vault is IVault {
      */
     function _payOffFees(uint amount) private returns (uint leftover) {
         uint totalFeesAccrued;
-        (totalFeesAccrued,) = _calculateFeesAccrued(block.timestamp);
+        (totalFeesAccrued,) = _calculateFeesAccrued(_timeProvider.getTime());
         uint feesPaid = 0;
         leftover = amount;
         if (leftover > totalFeesAccrued) {
@@ -242,7 +246,7 @@ contract Vault is IVault {
         path[0] = address(_eauToken);
         path[1] = address(_mdlyToken);
         // TODO clarify deadline for Uniswap
-        uint deadline = block.timestamp + 10000;
+        uint deadline = _timeProvider.getTime() + 10000;
         uint[] memory amounts = _medleyDao.getMdlyMarket().swapExactTokensForTokens(toBuyMdly, mdlyBoughtExpected, path, address(this), deadline);
         uint mdlyBought = amounts[1];
         require(toBuyMdly == amounts[0], "Vault::payOff(): not exact amount of EAU sold to buy MDLY");

@@ -9,6 +9,7 @@ import "./../token/ERC20/EAUToken.sol";
 import "./../token/ERC20/MDLYToken.sol";
 import "./../market/IPriceOracle.sol";
 import "./../market/IMarketAdaptor.sol";
+import "./ITimeProvider.sol";
 
 contract MedleyDAO is IMedleyDAO {
     address[] _vaults;
@@ -23,15 +24,18 @@ contract MedleyDAO is IMedleyDAO {
 
     IMarketAdaptor _mdlyMarket;
 
-    constructor(address mdlyToken, address eauToken, address mdlyPriceOracle, address mdlyMarket) {
+    ITimeProvider _timeProvider;
+
+    constructor(address mdlyToken, address eauToken, address mdlyPriceOracle, address mdlyMarket, address timeProvider) {
         _mdlyToken = MDLYToken(mdlyToken);
         _eauToken = EAUToken(eauToken);
         _mdlyPriceOracle = IPriceOracle(mdlyPriceOracle);
         _mdlyMarket = IMarketAdaptor(mdlyMarket);
+        _timeProvider = ITimeProvider(timeProvider);
     }
 
     function createVault(address token, uint stake, uint initialAmount, uint tokenPrice) external override returns (address) {
-        address vault = address(new Vault(msg.sender, stake, token, initialAmount, tokenPrice));
+        address vault = address(new Vault(msg.sender, stake, token, initialAmount, tokenPrice, _timeProvider));
         IERC20 tokenContract = IERC20(token);
         require(tokenContract.transferFrom(msg.sender, vault, initialAmount),
             "MedleyDAO: Transfer of user tokens not allowed");

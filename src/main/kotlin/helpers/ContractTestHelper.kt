@@ -30,6 +30,7 @@ class ContractTestHelper(host: String, port: Int) {
     val priceOracle: PriceOracleMock
     val marketAdaptor: MarketAdaptorMock
     val medleyDAO: MedleyDAO
+    val timeProvider: TimeProviderMock
 
     init {
         // Deploy contracts
@@ -42,6 +43,7 @@ class ContractTestHelper(host: String, port: Int) {
         marketAdaptor =
             MarketAdaptorMock.deploy(web3, seed, gasProvider, mdlyToken.contractAddress, eauToken.contractAddress)
                 .send()
+        timeProvider = TimeProviderMock.deploy(web3, seed, gasProvider).send()
         medleyDAO = MedleyDAO.deploy(
             web3,
             seed,
@@ -49,7 +51,8 @@ class ContractTestHelper(host: String, port: Int) {
             mdlyToken.contractAddress,
             eauToken.contractAddress,
             priceOracle.contractAddress,
-            marketAdaptor.contractAddress
+            marketAdaptor.contractAddress,
+            timeProvider.contractAddress
         ).send()
     }
 
@@ -97,7 +100,8 @@ class ContractTestHelper(host: String, port: Int) {
         mdlyTokenByOwner.approve(medleyDAO.contractAddress, stakeAmount).send()
 
         val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
-        val tx = medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
+        val tx =
+            medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
         return medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
     }
 }
