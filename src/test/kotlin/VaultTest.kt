@@ -62,15 +62,16 @@ class VaultTest {
     }
 
     /**
-     * @given MedleyDAO deployed and no vaults created and user has 10 UserTokens
-     * @when create vault called with 10 UserTokens by owner
-     * @then new vault created and vault owner is caller and 10 UserTokens transferred to the vault and credit limit is
+     * @given MedleyDAO deployed and no vaults created and user has 100 UserTokens
+     * @when create vault called with 100 UserTokens by owner and declare price as 2 EAU/Token
+     * @then new vault created and vault owner is caller and 100 UserTokens transferred to the vault and credit limit is
      * 25% of assessed value (100 TKN * 2 EAU / 4 = 50 EAU)
      */
     @Test
     fun createVault() {
         ownerCreatesVault(initialAmount, tokenPrice)
 
+        assertEquals(owner, vault.owner().send())
         assertEquals(initialAmount, userToken.balanceOf(vault.contractAddress).send())
         assertEquals(BigInteger.ZERO, userToken.balanceOf(owner).send())
         assertEquals(tokenPrice, vault.price.send())

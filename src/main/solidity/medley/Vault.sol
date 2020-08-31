@@ -9,8 +9,9 @@ import "./IVault.sol";
 import "./IMedleyDAO.sol";
 import "./../math/SafeMath.sol";
 import "./ITimeProvider.sol";
+import "./../utils/Ownable.sol";
 
-contract Vault is IVault {
+contract Vault is IVault, Ownable {
     using SafeMath for uint;
 
     // Types of accounting records
@@ -26,8 +27,6 @@ contract Vault is IVault {
     AccountingRecord[] _accountingBook;
 
     IMedleyDAO _medleyDao;
-
-    address _owner;
 
     EAUToken _eauToken;
     MDLYToken _mdlyToken;
@@ -58,9 +57,14 @@ contract Vault is IVault {
         _;
     }
 
-    constructor(address owner, uint stake, address token, uint initialAmount, uint tokenPrice, ITimeProvider timeProvider) {
+    constructor(
+        address owner,
+        uint stake,
+        address token,
+        uint initialAmount,
+        uint tokenPrice,
+        ITimeProvider timeProvider) Ownable(owner) {
         _medleyDao = IMedleyDAO(msg.sender);
-        _owner = owner;
         _eauToken = EAUToken(_medleyDao.getEauTokenAddress());
         _mdlyToken = MDLYToken(_medleyDao.getMdlyTokenAddress());
         _token = IERC20(token);
@@ -83,11 +87,10 @@ contract Vault is IVault {
         emit Purchase(amount, price, to);
     }
 
-    function borrow(uint amount) notClosed public override {
-        require(msg.sender == _owner, "Only owner can borrow");
+    function borrow(uint amount) notClosed onlyOwner public override {
         require(amount <= getCreditLimit(), "Credit limit is exhausted ");
 
-        _medleyDao.mintEAU(_owner, amount);
+        _medleyDao.mintEAU(owner(), amount);
         _principal += amount;
         _debtUpdateTime = _timeProvider.getTime();
         _recordAccounting(kWithdrowal, amount, _debtUpdateTime);
@@ -117,12 +120,11 @@ contract Vault is IVault {
         }
     }
 
-    function close() public override {
-        require(msg.sender == _owner);
+    function close() onlyOwner public override {
         require(getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is payed off");
-        _token.transfer(_owner, _token.balanceOf(address(this)));
-        _mdlyToken.transfer(_owner, _mdlyToken.balanceOf(address(this)));
-        _eauToken.transfer(_owner, _eauToken.balanceOf(address(this)));
+        _token.transfer(owner(), _token.balanceOf(address(this)));
+        _mdlyToken.transfer(owner(), _mdlyToken.balanceOf(address(this)));
+        _eauToken.transfer(owner(), _eauToken.balanceOf(address(this)));
         _closed = true;
     }
 

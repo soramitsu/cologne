@@ -33,11 +33,11 @@ class MedleyDaoTest {
 
     /**
      * @given MedleyDAO deployed and no vaults created
-     * @when create vault called
+     * @when create vault called by the User
      * @then new vault created and stored in MedleyDAO vault list
      */
     @Test
-    fun deployVault() {
+    fun createVault() {
         assertEquals(0, medleyDAO.listVaults().send().size)
 
         val vault = helper.createVault(helper.credentialsAlice, BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO)
