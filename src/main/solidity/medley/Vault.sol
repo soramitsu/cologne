@@ -47,8 +47,7 @@ contract Vault is IVault {
     uint _feeAccrued = 0;
     uint _debtUpdateTime;
 
-    bool _limitBreached = false;
-    uint _breachTime = 0;
+    uint _limitBreachedTime = 0;
 
     bool _closed = false;
 
@@ -112,6 +111,10 @@ contract Vault is IVault {
             _principal = _principal - leftover;
         }
         _eauToken.burn(principalPaid);
+
+        if (_principal.add(_feeAccrued) <= _tokenAmount.mul(_price).div(4)) {
+            _limitBreachedTime = 0;
+        }
     }
 
     function close() public override {
@@ -139,8 +142,9 @@ contract Vault is IVault {
     }
 
     function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
-        (debt,) = _calculateFeesAccrued(time);
-        debt = _principal.add(debt);
+        uint fees;
+        (fees,,) = _calculateFeesAccrued(time);
+        debt = _principal.add(fees);
         return debt;
     }
 
@@ -149,7 +153,7 @@ contract Vault is IVault {
     }
 
     function getPrice() public view override returns (uint price) {
-        (, price) = _calculateFeesAccrued(_timeProvider.getTime());
+        (, price,) = _calculateFeesAccrued(_timeProvider.getTime());
         return price;
     }
 
@@ -175,48 +179,48 @@ contract Vault is IVault {
     }
 
     /**
-     * Get price
-     * @param breachTime - time when limit was breached (0 if was not)
+     * Get Dutch auction price
+     * @param startTime - time when the auction was started (0 if was not)
      * @return price
      */
-    function _getPrice(uint breachTime) private view returns (uint price) {
+    function _getDutchAuctionPrice(uint startTime) private view returns (uint price) {
         // 30 min
         uint tickPriceChange = 1800;
         price = _price;
-        if (breachTime != 0) {
-            require(_timeProvider.getTime() >= breachTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
-            uint discount = ((_timeProvider.getTime().sub(breachTime)).div(tickPriceChange));
+        if (startTime != 0) {
+            require(_timeProvider.getTime() >= startTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
+            uint discount = ((_timeProvider.getTime().sub(startTime)).div(tickPriceChange));
             discount = discount % 101;
             price = price.mul(100 - discount).div(100);
         }
         return price;
     }
 
-    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint price) {
+    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint price, uint limitBreachedTime) {
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
 
         // period to accrue fee in seconds (one day)
         uint period = 86400;
 
-        // TODO calculate rate accrording the table
+        // TODO calculate rate according the table
         // rate per period multiplied by 1'000'000
         uint rate = uint(100000).div(365);
 
-        uint breachTime = 0;
-        price = _getPrice(breachTime);
+        limitBreachedTime = _limitBreachedTime;
+        price = _getDutchAuctionPrice(limitBreachedTime);
         feeAccrued = _feeAccrued;
         for (uint i = _debtUpdateTime; i < time; i = i + period) {
             uint limit = _tokenAmount.mul(price).div(4);
             // limit has been breached
             if (_principal.add(feeAccrued) > limit) {
-                if (breachTime == 0) {
-                    breachTime = i;
+                if (limitBreachedTime == 0) {
+                    limitBreachedTime = i;
                 }
-                price = _getPrice(breachTime);
+                price = _getDutchAuctionPrice(limitBreachedTime);
             }
             feeAccrued = feeAccrued + (_principal + feeAccrued) * rate / 1000000;
         }
-        return (feeAccrued, price);
+        return (feeAccrued, price, limitBreachedTime);
     }
 
     /**
@@ -226,7 +230,10 @@ contract Vault is IVault {
      */
     function _payOffFees(uint amount) private returns (uint leftover) {
         uint totalFeesAccrued;
-        (totalFeesAccrued,) = _calculateFeesAccrued(_timeProvider.getTime());
+        uint price;
+        uint limitBreachedTime;
+        (totalFeesAccrued, price, limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
+        _price = price;
         uint feesPaid = 0;
         leftover = amount;
         if (leftover > totalFeesAccrued) {
