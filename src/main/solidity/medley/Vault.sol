@@ -129,6 +129,7 @@ contract Vault is IVault, Ownable {
     }
 
     function slash() notClosed public override {
+        // if getPrice() == 0
         // TODO implement
     }
 
@@ -154,6 +155,10 @@ contract Vault is IVault, Ownable {
         return _principal;
     }
 
+    /**
+     * Get user token price
+     * Initially assessed by the vault owner, may be reduced during Initial Liquidity Vault Auction
+     */
     function getPrice() public view override returns (uint price) {
         (, price,) = _calculateFeesAccrued(_timeProvider.getTime());
         return price;
@@ -236,6 +241,7 @@ contract Vault is IVault, Ownable {
         uint limitBreachedTime;
         (totalFeesAccrued, price, limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
         _price = price;
+        _limitBreachedTime = limitBreachedTime;
         uint feesPaid = 0;
         leftover = amount;
         if (leftover > totalFeesAccrued) {
