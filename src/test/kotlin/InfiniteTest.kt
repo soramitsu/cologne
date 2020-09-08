@@ -35,7 +35,6 @@ class InfiniteTest {
     /**
      * Run testcontainer and deploy contracts
      */
-    @Disabled
     @Test
     fun infiniteRun() {
         println("MedleyDAO address" + helper.medleyDAO.contractAddress)
