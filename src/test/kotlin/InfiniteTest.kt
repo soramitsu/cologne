@@ -23,9 +23,6 @@ class InfiniteTest {
             .withExposedPorts(8545)
 
     lateinit var helper: ContractTestHelper
-    lateinit var alice: String
-    lateinit var bob: String
-    lateinit var cashStash: String
 
     @BeforeEach
     fun setUp() {
