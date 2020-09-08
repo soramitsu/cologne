@@ -1,0 +1,18 @@
+{
+  "presets": [
+    "@babel/react",
+    "@babel/env",
+    "@babel/preset-flow"
+  ],
+  "plugins": [
+    "@babel/plugin-transform-runtime",
+    "transform-class-properties",
+    "@babel/plugin-proposal-object-rest-spread",
+    [
+      "emotion",
+      {
+        "sourceMap": true
+      }
+    ]
+  ]
+}
