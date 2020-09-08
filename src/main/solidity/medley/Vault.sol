@@ -85,7 +85,26 @@ contract Vault is IVault, Ownable {
         uint price = getPrice();
         require(price > 0, "Vault::buy(): Initial Liquidity Auction is over");
         require(price <= maxPrice, "Vault::buy(): Price too low");
-        uint costInEau = amount * price;
+        uint costInEau = amount.mul(price);
+
+        // distribute penalty if Initial Liquidity Auction is active
+        if (_closeOutTime != 0) {
+            uint penalty = costInEau.div(10);
+            require(_eauToken.transferFrom(msg.sender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
+
+            _eauToken.approve(address(_medleyDao.getMdlyMarket()), penalty);
+            uint mdlyBought = _buyMdlyForEau(penalty);
+
+            uint initiatorBounty = mdlyBought.mul(33).div(100);
+            require(_mdlyToken.transfer(_closeOutInitiator, initiatorBounty), "Vault::buy: transfer MDLY bounty to initiator");
+
+            uint bidderBounty = mdlyBought.mul(33).div(100);
+            require(_mdlyToken.transfer(_closeOutInitiator, bidderBounty), "Vault::buy: transfer MDLY bounty to bidder");
+
+            _mdlyToken.burn(mdlyBought.sub(initiatorBounty).sub(bidderBounty));
+
+            costInEau = costInEau.sub(penalty);
+        }
 
         payOff(costInEau);
         require(_token.transfer(to, amount), "Vault::buy: cannot transfer EAU.");
@@ -126,7 +145,12 @@ contract Vault is IVault, Ownable {
 
         if (_principal.add(_feeAccrued) <= _tokenAmount.mul(_price).div(4)) {
             _limitBreachedTime = 0;
+            _closeOutTime = 0;
         }
+
+        uint price = getPrice();
+        if (_price != price)
+            _price = price;
     }
 
     function close() onlyOwner public override {
@@ -150,6 +174,10 @@ contract Vault is IVault, Ownable {
     function slash() notClosed public override {
         // if getPrice() == 0
         // TODO implement
+    }
+
+    function getTotalDebt() notClosed public view override returns (uint debt) {
+        return getTotalDebt(_timeProvider.getTime());
     }
 
     function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
@@ -278,24 +306,38 @@ contract Vault is IVault, Ownable {
             leftover = 0;
         }
         uint toBuyMdly = feesPaid.div(2);
-        // buy at price from oracle -10%
-        // TODO clarify price
-        uint mdlyBoughtExpected = _medleyDao.getMdlyPriceOracle().consult(address(_eauToken), toBuyMdly).mul(9).div(10);
-        address[] memory path = new address[](2);
-        path[0] = address(_eauToken);
-        path[1] = address(_mdlyToken);
-        // TODO clarify deadline for Uniswap
-        uint deadline = _timeProvider.getTime() + 10000;
-        uint[] memory amounts = _medleyDao.getMdlyMarket().swapExactTokensForTokens(toBuyMdly, mdlyBoughtExpected, path, address(this), deadline);
-        uint mdlyBought = amounts[1];
-        require(toBuyMdly == amounts[0], "Vault::payOff(): not exact amount of EAU sold to buy MDLY");
-        require(mdlyBoughtExpected >= mdlyBought, "Vault::payOff(): MDLY bought is less than expected");
+
+        uint mdlyBought = _buyMdlyForEau(toBuyMdly);
         _mdlyToken.burn(mdlyBought);
 
         // 50% of EAU are distributed
         _eauToken.distribute(feesPaid - toBuyMdly);
 
         return leftover;
+    }
+
+    /**
+     * Buy as many MDLY as possible for exact EAU amount
+     * @param eauAmount - to spend
+     * @return bought - amount bought
+     */
+    function _buyMdlyForEau(uint eauAmount) private returns (uint bought) {
+        address[] memory path = new address[](2);
+        path[0] = address(_eauToken);
+        path[1] = address(_mdlyToken);
+
+        // buy at price from oracle -10%
+        // TODO clarify price
+        uint mdlyBoughtExpected = _medleyDao.getMdlyPriceOracle().consult(address(_eauToken), eauAmount).mul(9).div(10);
+
+        // TODO clarify deadline for Uniswap
+        uint deadline = _timeProvider.getTime() + 10000;
+
+        uint[] memory amounts = _medleyDao.getMdlyMarket().swapExactTokensForTokens(eauAmount, mdlyBoughtExpected, path, address(this), deadline);
+        bought = amounts[1];
+        require(eauAmount == amounts[0], "Vault::buyMDLY(): not exact amount of EAU sold to buy MDLY");
+        require(mdlyBoughtExpected <= bought, "Vault::buyMDLY(): MDLY bought is less than expected");
+        return bought;
     }
 }
 

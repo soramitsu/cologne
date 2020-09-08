@@ -32,6 +32,9 @@ class ContractTestHelper(host: String, port: Int) {
     val medleyDAO: MedleyDAO
     val timeProvider: TimeProviderMock
 
+    // MDLY/EAU exchange rate
+    val mdlyEauPrice = BigInteger.TWO
+
     init {
         // Deploy contracts
         val seed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")

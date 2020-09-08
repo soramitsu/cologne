@@ -55,7 +55,7 @@ public class IVault extends Contract {
 
     public static final String FUNC_GETSTATE = "getState";
 
-    public static final String FUNC_GETTOTALDEBT = "getTotalDebt";
+    public static final String FUNC_getTotalDebt = "getTotalDebt";
 
     public static final String FUNC_PAYOFF = "payOff";
 
@@ -174,8 +174,15 @@ public class IVault extends Contract {
         return executeRemoteCallSingleValueReturn(function, BigInteger.class);
     }
 
+    public RemoteFunctionCall<BigInteger> getTotalDebt() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_getTotalDebt, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}));
+        return executeRemoteCallSingleValueReturn(function, BigInteger.class);
+    }
+
     public RemoteFunctionCall<BigInteger> getTotalDebt(BigInteger time) {
-        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETTOTALDEBT, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_getTotalDebt, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.generated.Uint256(time)), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}));
         return executeRemoteCallSingleValueReturn(function, BigInteger.class);

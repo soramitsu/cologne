@@ -1,6 +1,7 @@
 package acceptance
 
 import contract.EAUToken
+import contract.MDLYToken
 import contract.UserToken
 import contract.Vault
 import helpers.ContractTestHelper
@@ -40,6 +41,7 @@ class CloseOutAcceptanceTest {
     lateinit var eauToken: EAUToken
     lateinit var buyerEAUToken: EAUToken
     lateinit var buyerVault: Vault
+    lateinit var mdlyToken: MDLYToken
 
     @BeforeEach
     fun setUp() {
@@ -53,6 +55,7 @@ class CloseOutAcceptanceTest {
         eauToken =
             EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
         buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
+        mdlyToken = helper.mdlyToken
     }
 
 
@@ -197,7 +200,66 @@ class CloseOutAcceptanceTest {
         }
     }
 
-    // TODO buy - check penalty distribution
+    /**
+     * @given A breached vault with close-out process started. The vault has 100 TKN at price TKN/EAU = 2 and debt is
+     * 50 EAU.
+     * @when a buyer buys 1 TKN for 2 EAU
+     * @then the debt is paid off partially and breach is covered
+     */
+    @Test
+    fun buyTokensToCoverBreach() {
+        ownerCreatesVault()
+        val toBorrow = vault.creditLimit.send()
+        vault.borrow(toBorrow).send()
+        vault.startInitialLiquidityAuction().send()
+        val toBuy = BigInteger.ONE
+        val costInEau = toBuy.multiply(tokenPrice)
+        eauToken.mint(buyer.address, costInEau).send()
+        assertEquals(true, vault.isLimitBreached.send())
 
-    // TODO buy at initial auction to raise enough funds to cover the debt
+        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
+        buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
+
+        assertEquals(false, vault.isLimitBreached.send())
+        assertEquals(toBorrow.minus(costInEau), vault.totalDebt.send())
+        assertEquals(costInEau, vault.creditLimit.send())
+    }
+
+    /**
+     * @given A breached vault with close-out process started 30*60*50 = 90000 seconds ago. Price TKN/EAU discounted
+     * for 50% and = 1 now. The vault has 100 TKN and debt is 50 EAU and maximum credit limit is 25 EAU (25% of 100 TKN
+     * at price 1 TKN/EAU).
+     * @when a buyer buys 20 TKN for 20 EAU
+     * @then the debt is paid off partially and breach is not covered
+     */
+    @Test
+    fun buyTokensToCoverBreachAfterTime() {
+        ownerCreatesVault()
+        val toBorrow = vault.creditLimit.send()
+        vault.borrow(toBorrow).send()
+        vault.startInitialLiquidityAuction().send()
+        helper.passTime(BigInteger.valueOf(30 * 60 * 50))
+        val toBuy = BigInteger.valueOf(20)
+        val price = vault.price.send()
+        assertEquals(BigInteger.ONE, price)
+        val costInEau = toBuy.multiply(price)
+        eauToken.mint(buyer.address, costInEau).send()
+        assertEquals(true, vault.isLimitBreached.send())
+        // add MDLY to swap for penalty
+        val penaltyInMdly = toBuy.div(BigInteger.TEN).div(helper.mdlyEauPrice)
+        mdlyToken.mint(helper.marketAdaptor.contractAddress, penaltyInMdly).send()
+
+        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
+        buyerVault.buy(toBuy, price, buyer.address).send()
+
+        assertEquals(true, vault.isLimitBreached.send())
+        // old debt - (payed in EAU - 10% penalty)
+        val expectedDebt = toBorrow.minus(costInEau.minus(costInEau.divide(BigInteger.TEN)))
+        assertEquals(expectedDebt, vault.totalDebt.send())
+        assertEquals(BigInteger.ZERO, vault.creditLimit.send())
+    }
+
+
+    // TODO buy - check penalty distribution
+    // TODO buy - check penalty distribution rounding
 }

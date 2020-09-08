@@ -74,6 +74,7 @@ class BuyTokensAcceptanceTest {
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
 
+        assertEquals(BigInteger.ZERO, buyerEAUToken.allowance(buyer.address, vault.contractAddress).send())
         assertEquals(costInEau, eauToken.balanceOf(vault.contractAddress).send())
         assertEquals(BigInteger.ZERO, eauToken.balanceOf(buyer.address).send())
         assertEquals(initialAmount.minus(toBuy), userToken.balanceOf(vault.contractAddress).send())
