@@ -8,6 +8,7 @@ import "./../token/ERC20/MDLYToken.sol";
 import "./IVault.sol";
 import "./IMedleyDAO.sol";
 import "./../math/SafeMath.sol";
+import "./../math/Math.sol";
 import "./ITimeProvider.sol";
 import "./../utils/Ownable.sol";
 
@@ -48,9 +49,13 @@ contract Vault is IVault, Ownable {
 
     uint _limitBreachedTime = 0;
 
-    bool _closed = false;
-
     ITimeProvider _timeProvider;
+
+    // Close-out state - Initial Liquidity Dutch Auction started
+    uint _closeOutTime = 0;
+    address _closeOutInitiator;
+
+    bool _closed = false;
 
     modifier notClosed {
         require(!_closed, "Vault is closed");
@@ -78,11 +83,15 @@ contract Vault is IVault, Ownable {
     function buy(uint amount, uint maxPrice, address to) notClosed public override {
         require(amount <= _token.balanceOf(address(this)), "Vault::buy(): Not enough tokens to sell");
         uint price = getPrice();
+        require(price > 0, "Vault::buy(): Initial Liquidity Auction is over");
         require(price <= maxPrice, "Vault::buy(): Price too low");
         uint costInEau = amount * price;
 
         payOff(costInEau);
         require(_token.transfer(to, amount), "Vault::buy: cannot transfer EAU.");
+
+        if (_price != price)
+            _price = price;
 
         emit Purchase(amount, price, to);
     }
@@ -121,16 +130,37 @@ contract Vault is IVault, Ownable {
     }
 
     function close() onlyOwner public override {
-        require(getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is payed off");
+        require(getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
         _token.transfer(owner(), _token.balanceOf(address(this)));
         _mdlyToken.transfer(owner(), _mdlyToken.balanceOf(address(this)));
         _eauToken.transfer(owner(), _eauToken.balanceOf(address(this)));
         _closed = true;
     }
 
+    function startInitialLiquidityAuction() notClosed public override {
+        require(isLimitBreached(), "Vault::startInitialLiquidityAuction(): credit limit is not breached");
+        require(_closeOutTime == 0, "Vault::startInitialLiquidityAuction(): close-out already called");
+
+        _closeOutTime = _timeProvider.getTime();
+        _closeOutInitiator = msg.sender;
+
+        // TODO run Dutch Auction
+    }
+
     function slash() notClosed public override {
         // if getPrice() == 0
         // TODO implement
+    }
+
+    function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
+        uint fees;
+        (fees,) = _calculateFeesAccrued(time);
+        debt = _principal.add(fees);
+        return debt;
+    }
+
+    function getPrincipal() notClosed public view override returns (uint) {
+        return _principal;
     }
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
@@ -144,15 +174,11 @@ contract Vault is IVault, Ownable {
         }
     }
 
-    function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
-        uint fees;
-        (fees,,) = _calculateFeesAccrued(time);
-        debt = _principal.add(fees);
-        return debt;
-    }
-
-    function getPrincipal() notClosed public view override returns (uint) {
-        return _principal;
+    /**
+     * Checks if credit limit is breached
+     */
+    function isLimitBreached() notClosed public view returns (bool) {
+        return getTotalDebt(_timeProvider.getTime()) != 0 && getCreditLimit() == 0;
     }
 
     /**
@@ -160,8 +186,7 @@ contract Vault is IVault, Ownable {
      * Initially assessed by the vault owner, may be reduced during Initial Liquidity Vault Auction
      */
     function getPrice() public view override returns (uint price) {
-        (, price,) = _calculateFeesAccrued(_timeProvider.getTime());
-        return price;
+        return _getDutchAuctionPrice();
     }
 
     /**
@@ -187,24 +212,27 @@ contract Vault is IVault, Ownable {
 
     /**
      * Get Dutch auction price
-     * @param startTime - time when the auction was started (0 if was not)
      * @return price
      */
-    function _getDutchAuctionPrice(uint startTime) private view returns (uint price) {
+    function _getDutchAuctionPrice() private view returns (uint price) {
         // 30 min
         uint tickPriceChange = 1800;
         price = _price;
-        if (startTime != 0) {
-            require(_timeProvider.getTime() >= startTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
-            uint discount = ((_timeProvider.getTime().sub(startTime)).div(tickPriceChange));
+        if (_closeOutTime != 0) {
+            require(_timeProvider.getTime() >= _closeOutTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
+            uint discount = ((_timeProvider.getTime().sub(_closeOutTime)).div(tickPriceChange));
             discount = discount % 101;
             price = price.mul(100 - discount).div(100);
         }
         return price;
     }
 
-    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint price, uint limitBreachedTime) {
+    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint limitBreachedTime) {
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
+        uint endTime = time;
+        // Stop calculate fee when close-out process started
+        if (_closeOutTime != 0 && _closeOutTime < time)
+            endTime = _closeOutTime;
 
         // period to accrue fee in seconds (one day)
         uint period = 86400;
@@ -214,20 +242,18 @@ contract Vault is IVault, Ownable {
         uint rate = uint(100000).div(365);
 
         limitBreachedTime = _limitBreachedTime;
-        price = _getDutchAuctionPrice(limitBreachedTime);
         feeAccrued = _feeAccrued;
-        for (uint i = _debtUpdateTime; i < time; i = i + period) {
-            uint limit = _tokenAmount.mul(price).div(4);
+        for (uint i = _debtUpdateTime; i < endTime; i = i + period) {
+            uint limit = _tokenAmount.mul(_price).div(4);
             // limit has been breached
             if (_principal.add(feeAccrued) > limit) {
                 if (limitBreachedTime == 0) {
                     limitBreachedTime = i;
                 }
-                price = _getDutchAuctionPrice(limitBreachedTime);
             }
             feeAccrued = feeAccrued + (_principal + feeAccrued) * rate / 1000000;
         }
-        return (feeAccrued, price, limitBreachedTime);
+        return (feeAccrued, limitBreachedTime);
     }
 
     /**
@@ -237,10 +263,8 @@ contract Vault is IVault, Ownable {
      */
     function _payOffFees(uint amount) private returns (uint leftover) {
         uint totalFeesAccrued;
-        uint price;
         uint limitBreachedTime;
-        (totalFeesAccrued, price, limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
-        _price = price;
+        (totalFeesAccrued, limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
         _limitBreachedTime = limitBreachedTime;
         uint feesPaid = 0;
         leftover = amount;

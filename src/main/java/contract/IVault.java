@@ -61,6 +61,8 @@ public class IVault extends Contract {
 
     public static final String FUNC_SLASH = "slash";
 
+    public static final String FUNC_STARTINITIALLIQUIDITYAUCTION = "startInitialLiquidityAuction";
+
     public static final Event PURCHASE_EVENT = new Event("Purchase", 
             Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>(true) {}, new TypeReference<Address>(true) {}));
     ;
@@ -190,6 +192,14 @@ public class IVault extends Contract {
     public RemoteFunctionCall<TransactionReceipt> slash() {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_SLASH, 
+                Arrays.<Type>asList(), 
+                Collections.<TypeReference<?>>emptyList());
+        return executeRemoteCallTransaction(function);
+    }
+
+    public RemoteFunctionCall<TransactionReceipt> startInitialLiquidityAuction() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
+                FUNC_STARTINITIALLIQUIDITYAUCTION, 
                 Arrays.<Type>asList(), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);

@@ -104,4 +104,11 @@ class ContractTestHelper(host: String, port: Int) {
             medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
         return medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
     }
+
+    /**
+     * Set new time as current + period
+     */
+    fun passTime(period: BigInteger) {
+        timeProvider.setTime(timeProvider.time.send().add(period)).send()
+    }
 }
