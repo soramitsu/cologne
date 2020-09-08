@@ -55,11 +55,13 @@ public class IVault extends Contract {
 
     public static final String FUNC_GETSTATE = "getState";
 
-    public static final String FUNC_GETTOTALDEBT = "getTotalDebt";
+    public static final String FUNC_getTotalDebt = "getTotalDebt";
 
     public static final String FUNC_PAYOFF = "payOff";
 
     public static final String FUNC_SLASH = "slash";
+
+    public static final String FUNC_STARTINITIALLIQUIDITYAUCTION = "startInitialLiquidityAuction";
 
     public static final Event PURCHASE_EVENT = new Event("Purchase", 
             Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}, new TypeReference<Uint256>(true) {}, new TypeReference<Address>(true) {}));
@@ -172,8 +174,15 @@ public class IVault extends Contract {
         return executeRemoteCallSingleValueReturn(function, BigInteger.class);
     }
 
+    public RemoteFunctionCall<BigInteger> getTotalDebt() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_getTotalDebt, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}));
+        return executeRemoteCallSingleValueReturn(function, BigInteger.class);
+    }
+
     public RemoteFunctionCall<BigInteger> getTotalDebt(BigInteger time) {
-        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETTOTALDEBT, 
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_getTotalDebt, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.generated.Uint256(time)), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}));
         return executeRemoteCallSingleValueReturn(function, BigInteger.class);
@@ -190,6 +199,14 @@ public class IVault extends Contract {
     public RemoteFunctionCall<TransactionReceipt> slash() {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_SLASH, 
+                Arrays.<Type>asList(), 
+                Collections.<TypeReference<?>>emptyList());
+        return executeRemoteCallTransaction(function);
+    }
+
+    public RemoteFunctionCall<TransactionReceipt> startInitialLiquidityAuction() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
+                FUNC_STARTINITIALLIQUIDITYAUCTION, 
                 Arrays.<Type>asList(), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);

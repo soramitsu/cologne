@@ -11,10 +11,19 @@ interface IVault {
 
     function close() external;
 
+    /**
+      * Initiate close-out process
+      * Can be called by any Ethereum wallet if the vault has breached the liquidity limit.
+      * Starts Initial Liquidity Vault Auction.
+      */
+    function startInitialLiquidityAuction() external;
+
     function slash() external;
 
     // Get amount of EAU the owner can borrow now
     function getCreditLimit() external view returns (uint);
+
+    function getTotalDebt() external view returns (uint);
 
     // Get total debt as principal and accrued interest charge
     function getTotalDebt(uint time) external view returns (uint);
@@ -23,7 +32,7 @@ interface IVault {
 
     function getPrice() external view returns (uint);
 
-    function getCollateralInEau() external view returns(uint);
+    function getCollateralInEau() external view returns (uint);
 
     function getState() external view;
 

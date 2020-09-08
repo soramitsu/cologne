@@ -19,7 +19,7 @@ class VaultTest {
     private val ganache: GenericContainer<Nothing> =
         GenericContainer<Nothing>(
             ImageFromDockerfile()
-                .withDockerfile(Path.of(javaClass.getResource("docker/ganache/Dockerfile").toURI()))
+                .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
         )
             .withExposedPorts(8545)
 
@@ -55,8 +55,8 @@ class VaultTest {
     /**
      * Deploy vault with Owner credentials
      */
-    fun ownerCreatesVault(initialAmount: BigInteger, tokenPrice: BigInteger) {
-        val vaultAddress = helper.createVault(helper.credentialsAlice, stake, initialAmount, tokenPrice)
+    fun ownerCreatesVault(amount: BigInteger = initialAmount, price: BigInteger = tokenPrice) {
+        val vaultAddress = helper.createVault(helper.credentialsAlice, stake, amount, price)
         vault = Vault.load(vaultAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
     }
 
@@ -149,84 +149,6 @@ class VaultTest {
         assertThrows<TransactionException> {
             strangerVault.close().send()
         }
-    }
-
-    /**
-     * @given a vault with enough user token and a buyer with 40 EAU and price is 2 TKN/EAU
-     * @when the buyer buys 20 TKN with price at least 2 TKN/EAU
-     * @then 40 EAU go to the vault and 20 TKN go to the buyer
-     */
-    @Test
-    fun buyTokens() {
-        ownerCreatesVault(initialAmount, tokenPrice)
-        val buyer = helper.credentialsBob
-        val buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
-        val toBuy = BigInteger.valueOf(20)
-        val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
-        val buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
-
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
-
-        assertEquals(costInEau, eauToken.balanceOf(vault.contractAddress).send())
-        assertEquals(BigInteger.ZERO, eauToken.balanceOf(buyer.address).send())
-        assertEquals(initialAmount.minus(toBuy), userToken.balanceOf(vault.contractAddress).send())
-        assertEquals(toBuy, userToken.balanceOf(buyer.address).send())
-    }
-
-    /**
-     * @given a vault has insufficient user token (1 TKN) and a buyer with 40 EAU and price is 2 TKN/EAU
-     * @when the buyer buys 20 TKN with price at least 2 TKN/EAU
-     * @then deal rejected, balances are not changed
-     */
-    @Test
-    fun buyTokensNotEnoughTokens() {
-        val insufficientAmount = BigInteger.ONE
-        ownerCreatesVault(insufficientAmount, tokenPrice)
-        val buyer = helper.credentialsBob
-        val buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
-        val toBuy = BigInteger.valueOf(20)
-        val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
-        val buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
-
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        assertThrows<TransactionException> {
-            buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
-        }
-
-        assertEquals(BigInteger.ZERO, eauToken.balanceOf(vault.contractAddress).send())
-        assertEquals(costInEau, eauToken.balanceOf(buyer.address).send())
-        assertEquals(insufficientAmount, userToken.balanceOf(vault.contractAddress).send())
-        assertEquals(BigInteger.ZERO, userToken.balanceOf(buyer.address).send())
-    }
-
-    /**
-     * @given a vault has enough user token and a buyer with 40 EAU and price is 2 TKN/EAU
-     * @when the buyer buys 20 TKN with price at least 1 TKN/EAU
-     * @then deal rejected, balances are not changed
-     */
-    @Test
-    fun buyTokensPriceTooLow() {
-        ownerCreatesVault(initialAmount, tokenPrice)
-        val buyer = helper.credentialsBob
-        val buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
-        val toBuy = BigInteger.valueOf(20)
-        val priceTooHigh = BigInteger.ONE
-        val costInEau = toBuy.multiply(priceTooHigh)
-        eauToken.mint(buyer.address, costInEau).send()
-        val buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
-
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        assertThrows<TransactionException> {
-            buyerVault.buy(toBuy, priceTooHigh, buyer.address).send()
-        }
-
-        assertEquals(BigInteger.ZERO, eauToken.balanceOf(vault.contractAddress).send())
-        assertEquals(costInEau, eauToken.balanceOf(buyer.address).send())
-        assertEquals(initialAmount, userToken.balanceOf(vault.contractAddress).send())
-        assertEquals(BigInteger.ZERO, userToken.balanceOf(buyer.address).send())
     }
 
     /**

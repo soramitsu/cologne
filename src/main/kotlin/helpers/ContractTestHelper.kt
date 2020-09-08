@@ -32,6 +32,9 @@ class ContractTestHelper(host: String, port: Int) {
     val medleyDAO: MedleyDAO
     val timeProvider: TimeProviderMock
 
+    // MDLY/EAU exchange rate
+    val mdlyEauPrice = BigInteger.TWO
+
     init {
         // Deploy contracts
         val seed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
@@ -103,5 +106,12 @@ class ContractTestHelper(host: String, port: Int) {
         val tx =
             medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
         return medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
+    }
+
+    /**
+     * Set new time as current + period
+     */
+    fun passTime(period: BigInteger) {
+        timeProvider.setTime(timeProvider.time.send().add(period)).send()
     }
 }

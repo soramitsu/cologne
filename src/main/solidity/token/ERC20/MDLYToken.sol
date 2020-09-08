@@ -2,10 +2,10 @@
 
 pragma solidity ^0.7.0;
 
-import "./ERC20Snapshot.sol";
+import "./ERC20.sol";
 import "./IMintableBurnableERC20.sol";
 
-contract MDLYToken is ERC20Snapshot, IMintableBurnableERC20 {
+contract MDLYToken is ERC20, IMintableBurnableERC20 {
     using SafeMath for uint256;
 
     constructor() ERC20("Test MDLY token", "TEST_MDLY") {
