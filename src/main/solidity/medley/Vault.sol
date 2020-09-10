@@ -99,7 +99,7 @@ contract Vault is IVault, Ownable {
             require(_mdlyToken.transfer(_closeOutInitiator, initiatorBounty), "Vault::buy: transfer MDLY bounty to initiator");
 
             uint bidderBounty = mdlyBought.mul(33).div(100);
-            require(_mdlyToken.transfer(_closeOutInitiator, bidderBounty), "Vault::buy: transfer MDLY bounty to bidder");
+            require(_mdlyToken.transfer(msg.sender, bidderBounty), "Vault::buy: transfer MDLY bounty to bidder");
 
             _mdlyToken.burn(mdlyBought.sub(initiatorBounty).sub(bidderBounty));
 

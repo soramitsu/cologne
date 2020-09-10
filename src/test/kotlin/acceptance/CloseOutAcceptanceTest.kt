@@ -33,6 +33,7 @@ class CloseOutAcceptanceTest {
     val initialAmount = BigInteger.valueOf(100)
     val tokenPrice = BigInteger.valueOf(2)
     lateinit var helper: ContractTestHelper
+    lateinit var owner: Credentials
     lateinit var intitator: Credentials
     lateinit var buyer: Credentials
     lateinit var userToken: UserToken
@@ -46,14 +47,15 @@ class CloseOutAcceptanceTest {
     @BeforeEach
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
+        owner = helper.credentialsAlice
         intitator = helper.credentialsBob
-        buyer = helper.credentialsBob
+        buyer = helper.credentialsCharlie
         // load UserToken with owner credentials
         userToken =
-            UserToken.load(helper.userToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+            UserToken.load(helper.userToken.contractAddress, helper.web3, helper.credentialsSeed, helper.gasProvider)
         // load EAU token with owner credentials
         eauToken =
-            EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+            EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsSeed, helper.gasProvider)
         buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
         mdlyToken = helper.mdlyToken
     }
@@ -62,10 +64,10 @@ class CloseOutAcceptanceTest {
     /**
      * Deploy vault with Owner credentials
      */
-    fun ownerCreatesVault(price: BigInteger = tokenPrice) {
+    fun ownerCreatesVault(amount: BigInteger = initialAmount, price: BigInteger = tokenPrice) {
         val stake = BigInteger.valueOf(20)
-        val vaultAddress = helper.createVault(helper.credentialsAlice, stake, initialAmount, price)
-        vault = Vault.load(vaultAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+        val vaultAddress = helper.createVault(owner, stake, amount, price)
+        vault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
         intiatorVault = Vault.load(vault.contractAddress, helper.web3, intitator, helper.gasProvider)
         buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
     }
@@ -259,7 +261,35 @@ class CloseOutAcceptanceTest {
         assertEquals(BigInteger.ZERO, vault.creditLimit.send())
     }
 
+    /**
+     * @given A breached vault with close-out process started. The vault has 8000 TKN and debt is 2000 EAU and price is
+     * 1 TKN/EAU and MDLY/EAU price = 2.
+     * @when a buyer buys 2000 TKN for 2000 EAU
+     * @then the penalty is 200 EAU (10%) used to buy 100 MDLY
+     * - 33 MDLY goes to the initator
+     * - 33 MDLY goes to buyer
+     * - 34 MDLY burnt
+     */
+    @Test
+    fun distributeBounty() {
+        val toBuy = BigInteger.valueOf(2000)
+        val price = BigInteger.ONE
+        val costInEau = toBuy.multiply(price)
+        eauToken.mint(buyer.address, costInEau).send()
+        ownerCreatesVault(amount = BigInteger.valueOf(8000), price = price)
+        val toBorrow = vault.creditLimit.send()
+        vault.borrow(toBorrow).send()
+        intiatorVault.startInitialLiquidityAuction().send()
+        // add MDLY to swap for penalty
+        val penaltyInMdly = toBuy.div(BigInteger.TEN).div(helper.mdlyEauPrice)
+        mdlyToken.mint(helper.marketAdaptor.contractAddress, penaltyInMdly).send()
+        val mdlySupply = mdlyToken.totalSupply().send()
 
-    // TODO buy - check penalty distribution
-    // TODO buy - check penalty distribution rounding
+        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
+        buyerVault.buy(toBuy, price, buyer.address).send()
+
+        assertEquals(BigInteger.valueOf(33), mdlyToken.balanceOf(intitator.address).send())
+        assertEquals(BigInteger.valueOf(33), mdlyToken.balanceOf(buyer.address).send())
+        assertEquals(mdlySupply.minus(BigInteger.valueOf(34)), mdlyToken.totalSupply().send())
+    }
 }
