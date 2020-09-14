@@ -6,6 +6,9 @@ import "./IMarketAdaptor.sol";
 import "../math/SafeMath.sol";
 import "../token/ERC20/ERC20.sol";
 
+/**
+ * MDLY/EAU market
+ */
 contract MarketAdaptorMock is IMarketAdaptor {
     using SafeMath for uint256;
 
@@ -81,10 +84,8 @@ contract MarketAdaptorMock is IMarketAdaptor {
         ret[0] = amountIn;
         if (path[0] == address(_mdly)) {
             ret[1] = ret[0].mul(_rate);
-            require(_eau.balanceOf(address(this)) >= ret[1], "Market balance not enough balance");
         } else if (path[0] == address(_eau)) {
             ret[1] = ret[0].div(_rate);
-            require(_mdly.balanceOf(address(this)) >= ret[1], "Market balance not enough balance");
         }
         return ret;
     }
@@ -101,10 +102,8 @@ contract MarketAdaptorMock is IMarketAdaptor {
         ret[1] = amountOut;
         if (path[0] == address(_mdly)) {
             ret[0] = ret[1].div(_rate);
-            require(_eau.balanceOf(address(this)) >= ret[1], "Market balance not enough EAU");
         } else if (path[0] == address(_eau)) {
             ret[0] = ret[1].mul(_rate);
-            require(_mdly.balanceOf(address(this)) >= ret[1], "Market balance not enough MDLY");
         }
         return ret;
     }

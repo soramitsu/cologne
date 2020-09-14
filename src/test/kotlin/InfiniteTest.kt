@@ -33,8 +33,9 @@ class InfiniteTest {
      * Run testcontainer and deploy contracts
      */
     @Test
+//    @Disabled
     fun infiniteRun() {
-        println("MedleyDAO address" + helper.medleyDAO.contractAddress)
+        println("MedleyDAO address: " + helper.medleyDAO.contractAddress)
         Thread.sleep(Long.MAX_VALUE)
     }
 }

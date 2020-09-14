@@ -168,12 +168,65 @@ contract Vault is IVault, Ownable {
         _closeOutTime = _timeProvider.getTime();
         _closeOutInitiator = msg.sender;
 
-        // TODO run Dutch Auction
+        (_feeAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
+        _debtUpdateTime = _timeProvider.getTime();
     }
 
     function slash() notClosed public override {
-        // if getPrice() == 0
-        // TODO implement
+        // 180000 is a length of Initial Liquidity Auction in seconds
+        require(_closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000), "Vault::slash(): initial auction is not finished yet");
+
+        // determine amount MDLY to sell
+        uint debt = getTotalDebt();
+        // TODO market getAmountsIn
+
+        address[] memory path = new address[](2);
+        path[0] = address(_mdlyToken);
+        path[1] = address(_eauToken);
+        uint[] memory amounts = _medleyDao.getMdlyMarket().getAmountsIn(debt, path);
+        uint mdlyToSell = amounts[0];
+        if (mdlyToSell > _collateral)
+            mdlyToSell = _collateral;
+
+        // distribute penalty
+        uint penalty = mdlyToSell.div(10);
+        uint part = penalty.div(4);
+        // 25% of penalty to close out initiator
+        require(_mdlyToken.transfer(_closeOutInitiator, part), "Vault::slash(): pay close out bounty error");
+        // 25% of penalty to slashing initiator
+        require(_mdlyToken.transfer(msg.sender, part), "Vault::slash(): pay slashing bounty error");
+        // remaining to burn
+        _mdlyToken.burn(penalty.sub(part.mul(2)));
+        _collateral -= penalty;
+
+        // sell staked MDLY for EAU
+        if (mdlyToSell > _collateral)
+            mdlyToSell = _collateral;
+        amounts = _medleyDao.getMdlyMarket().getAmountsOut(mdlyToSell, path);
+        uint eauToBuy = amounts[1];
+        if (eauToBuy > debt)
+            eauToBuy = debt;
+        _mdlyToken.approve(address(_medleyDao.getMdlyMarket()), mdlyToSell);
+        uint eauLeftover = _sellMdlyForEau(mdlyToSell, eauToBuy);
+        _collateral -= mdlyToSell;
+
+        // pay off principal
+        if (_principal <= eauLeftover) {
+            _eauToken.burn(_principal);
+            eauLeftover -= _principal;
+            _principal = 0;
+        } else {
+            _eauToken.burn(eauLeftover);
+            _principal -= eauLeftover;
+            eauLeftover = 0;
+        }
+
+        // pay off fees accrued
+        require(eauLeftover <= _feeAccrued, "Slashing: Too many EAU got from slashing");
+        _distributeFee(eauLeftover);
+
+        // forgive fees
+        _feeAccrued = 0;
     }
 
     function getTotalDebt() notClosed public view override returns (uint debt) {
@@ -181,14 +234,21 @@ contract Vault is IVault, Ownable {
     }
 
     function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
-        uint fees;
-        (fees,) = _calculateFeesAccrued(time);
-        debt = _principal.add(fees);
+        debt = _principal.add(getFees(time));
         return debt;
     }
 
     function getPrincipal() notClosed public view override returns (uint) {
         return _principal;
+    }
+
+    function getFees() notClosed public view override returns (uint) {
+        return getFees(_timeProvider.getTime());
+    }
+
+    function getFees(uint time) notClosed public view override returns (uint fees) {
+        (fees,) = _calculateFeesAccrued(time);
+        return fees;
     }
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
@@ -221,7 +281,7 @@ contract Vault is IVault, Ownable {
      * Get MDLY collateral in EAU
      */
     function getCollateralInEau() public view override returns (uint) {
-        return _medleyDao.getMdlyPriceOracle().consult(_medleyDao.getMdlyTokenAddress(), _collateral);
+        return _medleyDao.getMdlyPriceOracle().consult(address(_mdlyToken), _collateral);
     }
 
     function getState() public view override {
@@ -305,15 +365,21 @@ contract Vault is IVault, Ownable {
             _feeAccrued = totalFeesAccrued - leftover;
             leftover = 0;
         }
-        uint toBuyMdly = feesPaid.div(2);
+        _distributeFee(feesPaid);
 
+        return leftover;
+    }
+
+    function _distributeFee(uint amount) private {
+        uint toBuyMdly = amount.div(2);
+
+        // 50% to buy and burn MDLY
+        _eauToken.approve(address(_medleyDao.getMdlyMarket()), toBuyMdly);
         uint mdlyBought = _buyMdlyForEau(toBuyMdly);
         _mdlyToken.burn(mdlyBought);
 
         // 50% of EAU are distributed
-        _eauToken.distribute(feesPaid - toBuyMdly);
-
-        return leftover;
+        _eauToken.distribute(amount - toBuyMdly);
     }
 
     /**
@@ -337,6 +403,28 @@ contract Vault is IVault, Ownable {
         bought = amounts[1];
         require(eauAmount == amounts[0], "Vault::buyMDLY(): not exact amount of EAU sold to buy MDLY");
         require(mdlyBoughtExpected <= bought, "Vault::buyMDLY(): MDLY bought is less than expected");
+        return bought;
+    }
+
+    /**
+     * Sell as few mdly as possible to get exact amount of eau
+     */
+    function _sellMdlyForEau(uint maxMdlyAmount, uint exactEauAmount) private returns (uint bought) {
+        address[] memory path = new address[](2);
+        path[0] = address(_mdlyToken);
+        path[1] = address(_eauToken);
+
+        // TODO check oracle price
+        // uint mdlyToSell = _medleyDao.getMdlyPriceOracle().consult(address(_eauToken), debt);
+
+        // TODO clarify deadline for Uniswap
+        uint deadline = _timeProvider.getTime() + 10000;
+
+        uint[] memory amounts = _medleyDao.getMdlyMarket().swapTokensForExactTokens(exactEauAmount, maxMdlyAmount, path, address(this), deadline);
+        uint sold = amounts[0];
+        bought = amounts[1];
+        require(sold <= maxMdlyAmount, "Vault::buyMDLY(): MDLY sold is more than expected");
+        require(bought == exactEauAmount, "Vault::buyMDLY(): not exact amount of EAU bought for MDLY");
         return bought;
     }
 }

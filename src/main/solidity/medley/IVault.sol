@@ -30,6 +30,11 @@ interface IVault {
 
     function getPrincipal() external view returns (uint);
 
+    function getFees() external view returns (uint);
+
+    // calculate fees over time
+    function getFees(uint time) external view returns (uint);
+
     function getPrice() external view returns (uint);
 
     function getCollateralInEau() external view returns (uint);

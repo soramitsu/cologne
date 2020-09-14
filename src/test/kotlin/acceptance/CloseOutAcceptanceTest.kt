@@ -60,7 +60,6 @@ class CloseOutAcceptanceTest {
         mdlyToken = helper.mdlyToken
     }
 
-
     /**
      * Deploy vault with Owner credentials
      */
@@ -163,8 +162,7 @@ class CloseOutAcceptanceTest {
     @Test
     fun buyTokensWhenVaultBreached() {
         ownerCreatesVault()
-        val toBorrow = vault.creditLimit.send()
-        vault.borrow(toBorrow).send()
+        breachVault()
         val costInEau = toBuy.multiply(tokenPrice)
         eauToken.mint(buyer.address, costInEau).send()
 
@@ -187,8 +185,7 @@ class CloseOutAcceptanceTest {
     @Test
     fun buyTokensWhenInitialLiquidityAuctionIsOver() {
         ownerCreatesVault()
-        val toBorrow = vault.creditLimit.send()
-        vault.borrow(toBorrow).send()
+        breachVault()
         val costInEau = toBuy.multiply(tokenPrice)
         eauToken.mint(buyer.address, costInEau).send()
         vault.startInitialLiquidityAuction().send()
@@ -212,7 +209,7 @@ class CloseOutAcceptanceTest {
     fun buyTokensToCoverBreach() {
         ownerCreatesVault()
         val toBorrow = vault.creditLimit.send()
-        vault.borrow(toBorrow).send()
+        breachVault()
         vault.startInitialLiquidityAuction().send()
         val toBuy = BigInteger.ONE
         val costInEau = toBuy.multiply(tokenPrice)
@@ -238,7 +235,7 @@ class CloseOutAcceptanceTest {
     fun buyTokensToCoverBreachAfterTime() {
         ownerCreatesVault()
         val toBorrow = vault.creditLimit.send()
-        vault.borrow(toBorrow).send()
+        breachVault()
         vault.startInitialLiquidityAuction().send()
         helper.passTime(BigInteger.valueOf(30 * 60 * 50))
         val toBuy = BigInteger.valueOf(20)
@@ -277,8 +274,7 @@ class CloseOutAcceptanceTest {
         val costInEau = toBuy.multiply(price)
         eauToken.mint(buyer.address, costInEau).send()
         ownerCreatesVault(amount = BigInteger.valueOf(8000), price = price)
-        val toBorrow = vault.creditLimit.send()
-        vault.borrow(toBorrow).send()
+        breachVault()
         intiatorVault.startInitialLiquidityAuction().send()
         // add MDLY to swap for penalty
         val penaltyInMdly = toBuy.div(BigInteger.TEN).div(helper.mdlyEauPrice)
