@@ -17,7 +17,7 @@ const Routes = (
       </BasicLayout>
 
       <AuthorizedLayout path="/main">
-        <EquipmentPage />
+        <MainPage />
       </AuthorizedLayout>
 
     </Switch>

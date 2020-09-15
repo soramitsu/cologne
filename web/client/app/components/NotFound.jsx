@@ -1,6 +1,6 @@
 import React from "react";
 import {Link} from "react-router-dom";
-import styled from "react-emotion";
+import styled from "@emotion/styled";
 
 const Wrapper = styled("div")`
   text-align: center;

@@ -1,7 +1,7 @@
 import React from "react";
 import {connect} from "react-redux";
 import {Route} from "react-router-dom";
-import styled from "react-emotion";
+import styled from "@emotion/styled";
 import Header from "./Header";
 import MainPage from "./MainPage";
 

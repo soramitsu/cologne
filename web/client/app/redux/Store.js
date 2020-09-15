@@ -1,7 +1,6 @@
 import throttle from "lodash/throttle";
 import {applyMiddleware, createStore} from "redux";
 import thunk from "redux-thunk";
-import axios from "axios";
 import rootReducer from "./RootReducer";
 import {loadState, saveState} from "../common/SessionStorage";
 import {engFormatter, rusFormatter} from "../common/Utils";

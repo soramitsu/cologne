@@ -1,16 +1,8 @@
 import React from "react";
 import PropTypes from "prop-types";
-import styled from "react-emotion";
+import {Container} from "semantic-ui-react";
 
-const Wrapper = styled("div")`
-  position: relative;
-  width: 100%;
-  height: auto;
-  min-height: 100%;
-  overflow-x: hidden;
-`;
-
-const AppWrapper = props => <Wrapper>{props.children}</Wrapper>;
+const AppWrapper = props => <Container>{props.children}</Container>;
 
 AppWrapper.propTypes = {
   children: PropTypes.oneOfType([

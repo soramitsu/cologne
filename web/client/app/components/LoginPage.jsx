@@ -1,38 +1,36 @@
 import React from "react";
 import {connect} from "react-redux";
-import {
-  BigTitle,
-} from "../common/styles";
-import {ConnectButton, LoginWrapper} from "../common/styles";
 import {loginUser} from "../redux/actions/User";
+import {Button, Container, Header} from "semantic-ui-react";
 import MetaMaskOnboarding from '@metamask/onboarding';
 
 const LoginPage = class extends React.Component {
   render() {
     return (
-      <div>
+      <Container>
         {
           typeof window.ethereum !== 'undefined' &&
-            <LoginWrapper>
-              <BigTitle>Please connect your Metamask wallet</BigTitle>
-              <ConnectButton onClick={async () => {
-                const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-                if (accounts.length > 0) {
-                  console.log("here!");
-                  this.props.loginUser({
-                    account: accounts[0]
-                  });
-                } else {
-                  //TODO: proper error handling
-                }
-              }}>Connect</ConnectButton>
-            </LoginWrapper>
+            <Container textAlign='center' style={{ marginTop: '7em' }}>
+              <Header as='h1'>Please connect your Metamask wallet</Header>
+              <Button size="massive" color='orange' content='Connect'
+                  onClick={async () => {
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    if (accounts.length > 0) {
+                      this.props.loginUser({
+                        account: accounts[0]
+                      });
+                    } else {
+                      //TODO: proper error handling
+                    }
+                  }}
+              />
+            </Container>
         }
         {
           typeof window.ethereum == 'undefined' &&
-          <BigTitle>For the system to work, you will need to install <a href="https://metamask.io/">Metamask</a></BigTitle>
+          <Header as='h1'>For the system to work, you will need to install <a href="https://metamask.io/">Metamask</a></Header>
         }
-      </div>
+      </Container>
     );
   }
 };
@@ -46,12 +44,6 @@ export function OnboardingButton() {
   const [isDisabled, setDisabled] = React.useState(false);
   const [accounts, setAccounts] = React.useState([]);
   const onboarding = React.useRef();
-
-  React.useEffect(() => {
-    if (!onboarding.current) {
-      onboarding.current = new MetaMaskOnboarding();
-    }
-  }, []);
 
   React.useEffect(() => {
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
@@ -90,6 +82,7 @@ export function OnboardingButton() {
       onboarding.current.startOnboarding();
     }
   };
+
   return (
       <button disabled={isDisabled} onClick={onClick}>
         {buttonText}

@@ -1,9 +1,5 @@
 /* eslint-disable react/no-children-prop */
-import "babel-polyfill";
-import "normalize.css";
-import "./assets/fonts/fonts.css";
-import "rc-slider/assets/index.css";
-import "./assets/custom.css";
+import 'semantic-ui-css/semantic.min.css'
 
 import React from "react";
 import {render} from "react-dom";
@@ -27,3 +23,4 @@ const renderApp = () => {
 store.subscribe(renderApp);
 
 renderApp();
+
