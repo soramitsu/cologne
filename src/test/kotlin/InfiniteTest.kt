@@ -13,7 +13,6 @@ import java.nio.file.Path
  */
 @Testcontainers
 class InfiniteTest {
-
     @Container
     private val ganache: GenericContainer<Nothing> =
         GenericContainer<Nothing>(
@@ -34,7 +33,7 @@ class InfiniteTest {
      */
     @Test
     fun infiniteRun() {
-        println("MedleyDAO address" + helper.medleyDAO.contractAddress)
+        println("MedleyDAO address " + helper.medleyDAO.contractAddress)
         Thread.sleep(Long.MAX_VALUE)
     }
 }
