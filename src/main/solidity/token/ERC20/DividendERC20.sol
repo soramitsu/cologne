@@ -24,7 +24,7 @@ contract DividendERC20 is ERC20Snapshot {
     }
 
     function distribute(uint256 amount) external returns (uint256) {
-        transfer(address(this), amount);
+        require(transfer(address(this), amount), "ERC20 Dividends disrtibution error");
         _lastDistributionId = snapshot();
         _distributions[_lastDistributionId] = amount;
         return _lastDistributionId;

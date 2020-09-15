@@ -20,8 +20,10 @@ class ContractTestHelper(host: String, port: Int) {
     val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(4_500_000))
 
     // Ethereum wallets
+    val credentialsSeed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
     val credentialsAlice = Credentials.create("0x2222222222222222222222222222222222222222222222222222222222222222")
     val credentialsBob = Credentials.create("0x3333333333333333333333333333333333333333333333333333333333333333")
+    val credentialsCharlie = Credentials.create("0x4444444444444444444444444444444444444444444444444444444444444444")
 
     // Contracts
     val mdlyToken: MDLYToken
