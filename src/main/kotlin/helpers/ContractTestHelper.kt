@@ -32,6 +32,7 @@ class ContractTestHelper(host: String, port: Int) {
     val priceOracle: PriceOracleMock
     val marketAdaptor: MarketAdaptorMock
     val medleyDAO: MedleyDAO
+    lateinit var vaultByOwner: Vault
     val timeProvider: TimeProviderMock
 
     // MDLY/EAU exchange rate
@@ -107,7 +108,11 @@ class ContractTestHelper(host: String, port: Int) {
         val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
         val tx =
             medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
-        return medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
+        val vaultAddress = medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
+
+        vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
+
+        return vaultAddress
     }
 
     /**
@@ -115,5 +120,13 @@ class ContractTestHelper(host: String, port: Int) {
      */
     fun passTime(period: BigInteger) {
         timeProvider.setTime(timeProvider.time.send().add(period)).send()
+    }
+
+    /**
+     * Breach credit limit
+     */
+    fun breachVault() {
+        val toBorrow = vaultByOwner.creditLimit.send()
+        vaultByOwner.borrow(toBorrow).send()
     }
 }

@@ -62,6 +62,12 @@ contract Vault is IVault, Ownable {
         _;
     }
 
+    modifier initialAuctionIsOver {
+        // 180000 is a length of Initial Liquidity Auction in seconds
+        require(_closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000), "Vault::slash(): initial auction is not finished yet");
+        _;
+    }
+
     constructor(
         address owner,
         uint stake,
@@ -172,10 +178,7 @@ contract Vault is IVault, Ownable {
         _debtUpdateTime = _timeProvider.getTime();
     }
 
-    function slash() notClosed public override {
-        // 180000 is a length of Initial Liquidity Auction in seconds
-        require(_closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000), "Vault::slash(): initial auction is not finished yet");
-
+    function slash() notClosed initialAuctionIsOver public override {
         // determine amount MDLY to sell
         uint debt = getTotalDebt();
         // TODO market getAmountsIn
@@ -228,6 +231,16 @@ contract Vault is IVault, Ownable {
         // forgive fees
         _feeAccrued = 0;
     }
+
+    function coverShortfall() notClosed initialAuctionIsOver public override {
+        require(_collateral == 0, "Cover shortfall: can be called only after slashing");
+        // TODO check caller
+        // calculate debt and amount to mint
+        // mint MDLY
+        // sell MDLY for EAU
+        // reward callerMDLY
+    }
+
 
     function getTotalDebt() notClosed public view override returns (uint debt) {
         return getTotalDebt(_timeProvider.getTime());

@@ -20,6 +20,11 @@ interface IVault {
 
     function slash() external;
 
+    /**
+     * Mint and sell MDLY on MDLY auction to cover shortfall
+     */
+    function coverShortfall() external;
+
     // Get amount of EAU the owner can borrow now
     function getCreditLimit() external view returns (uint);
 
