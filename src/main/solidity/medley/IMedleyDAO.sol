@@ -18,6 +18,8 @@ interface IMedleyDAO {
 
     function mintEAU(address beneficiary, uint amount) external;
 
+    function mintMDLY(address beneficiary, uint amount) external;
+
     function getMdlyTokenAddress() external view returns (address);
 
     function getEauTokenAddress() external view returns (address);

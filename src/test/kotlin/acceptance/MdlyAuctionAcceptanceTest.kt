@@ -15,6 +15,7 @@ import org.web3j.crypto.Credentials
 import org.web3j.protocol.exceptions.TransactionException
 import java.math.BigInteger
 import java.nio.file.Path
+import org.junit.jupiter.api.Assertions.assertEquals
 
 @Testcontainers
 class MdlyAuctionAcceptanceTest {
@@ -27,25 +28,28 @@ class MdlyAuctionAcceptanceTest {
         )
             .withExposedPorts(8545)
 
-    val initialAmount = BigInteger.valueOf(1000)
-    val tokenPrice = BigInteger.valueOf(2)
-    val initialStake = BigInteger.valueOf(100)
+    val initialAmount = BigInteger.valueOf(4000)
+    val tokenPrice = BigInteger.ONE
+    val initialStake = BigInteger.ZERO
     lateinit var helper: ContractTestHelper
     lateinit var owner: Credentials
     lateinit var auctionInitiator: Credentials
-    lateinit var slashingIntiator: Credentials
+    lateinit var slashingInitiator: Credentials
+    lateinit var coverInitiator: Credentials
     lateinit var eauToken: EAUToken
     lateinit var mdlyToken: MDLYToken
     lateinit var ownerVault: Vault
     lateinit var auctionIntiatorVault: Vault
     lateinit var slashingInitiatorVault: Vault
+    lateinit var coverInitiatorVault: Vault
 
     @BeforeEach
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
         owner = helper.credentialsAlice
         auctionInitiator = helper.credentialsBob
-        slashingIntiator = helper.credentialsCharlie
+        slashingInitiator = helper.credentialsCharlie
+        coverInitiator = helper.credentialsDave
         eauToken = helper.eauToken
         mdlyToken = helper.mdlyToken
     }
@@ -60,9 +64,9 @@ class MdlyAuctionAcceptanceTest {
     ) {
         val vaultAddress = helper.createVault(owner, stake, amount, price)
         ownerVault = helper.vaultByOwner
-        auctionIntiatorVault = Vault.load(ownerVault.contractAddress, helper.web3, auctionInitiator, helper.gasProvider)
-        slashingInitiatorVault =
-            Vault.load(ownerVault.contractAddress, helper.web3, slashingIntiator, helper.gasProvider)
+        auctionIntiatorVault = Vault.load(vaultAddress, helper.web3, auctionInitiator, helper.gasProvider)
+        slashingInitiatorVault = Vault.load(vaultAddress, helper.web3, slashingInitiator, helper.gasProvider)
+        coverInitiatorVault = Vault.load(vaultAddress, helper.web3, coverInitiator, helper.gasProvider)
     }
 
     /**
@@ -91,7 +95,7 @@ class MdlyAuctionAcceptanceTest {
         ownerVault.close().send()
 
         assertThrows<TransactionException> {
-            ownerVault.coverShortfall().send()
+            coverInitiatorVault.coverShortfall().send()
         }
     }
 
@@ -107,11 +111,64 @@ class MdlyAuctionAcceptanceTest {
         auctionIntiatorVault.startInitialLiquidityAuction().send()
 
         assertThrows<TransactionException> {
-            ownerVault.coverShortfall().send()
+            coverInitiatorVault.coverShortfall().send()
         }
     }
 
-    // TODO call invalid caller
-    // sunny day
+    /**
+     * @given the vault is breached and the initial liquidity auction is over and not slashed
+     * @when cover shortfall called
+     * @then error returned - should be slashed
+     */
+    @Test
+    fun coverShortfallNotSlashed() {
+        ownerCreatesVault(stake = BigInteger.TEN)
+        breachVault()
+        failInitialAuction()
 
+        assertThrows<TransactionException> {
+            coverInitiatorVault.coverShortfall().send()
+        }
+    }
+
+    /**
+     * @given the vault is breached and the initial liquidity auction is over and caller doesn't have MDLY
+     * @when cover shortfall called
+     * @then error returned - MDLY holder with at least 5% of total remaining outstanding EAU notional in the defaulted
+     * Vault can initiate a MDLY mint
+     */
+    @Test
+    fun coverShortfallWrongInitiator() {
+        ownerCreatesVault()
+        breachVault()
+        failInitialAuction()
+
+        assertThrows<TransactionException> {
+            coverInitiatorVault.coverShortfall().send()
+        }
+    }
+
+    /**
+     * @given the vault is slashed and has debt of 1000 EAU and cover initiator has 25 MDLY (assessed as 50 EAU) which
+     * is 5% of outstanding debt
+     * @when cover shortfall called
+     * @then 550 MDLY minted and sold for 1100 EAU, 1000 EAU are paid off and 100 EAU paid to initiator as bounty
+     */
+    @Test
+    fun coverShortfall() {
+        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1100)).send()
+        mdlyToken.mint(coverInitiator.address, BigInteger.valueOf(25)).send()
+        ownerCreatesVault()
+        breachVault()
+        failInitialAuction()
+        assertEquals(BigInteger.ZERO, ownerVault.fees.send())
+        assertEquals(BigInteger.valueOf(1000), ownerVault.principal.send())
+        val initialMdlySupply = mdlyToken.totalSupply().send()
+
+        coverInitiatorVault.coverShortfall().send()
+
+        assertEquals(BigInteger.valueOf(550), mdlyToken.totalSupply().send().subtract(initialMdlySupply))
+        assertEquals(BigInteger.ZERO, ownerVault.getTotalDebt().send())
+        assertEquals(BigInteger.valueOf(100), eauToken.balanceOf(coverInitiator.address).send())
+    }
 }
