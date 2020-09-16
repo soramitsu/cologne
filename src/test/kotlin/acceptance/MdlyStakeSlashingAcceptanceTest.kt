@@ -70,8 +70,7 @@ class MdlyStakeSlashingAcceptanceTest {
      * Breach credit limit
      */
     fun breachVault() {
-        val toBorrow = ownerVault.creditLimit.send()
-        ownerVault.borrow(toBorrow).send()
+        helper.breachVault()
     }
 
     /**

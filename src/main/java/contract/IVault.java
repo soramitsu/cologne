@@ -45,6 +45,8 @@ public class IVault extends Contract {
 
     public static final String FUNC_CLOSE = "close";
 
+    public static final String FUNC_COVERSHORTFALL = "coverShortfall";
+
     public static final String FUNC_GETCOLLATERALINEAU = "getCollateralInEau";
 
     public static final String FUNC_GETCREDITLIMIT = "getCreditLimit";
@@ -143,6 +145,14 @@ public class IVault extends Contract {
     public RemoteFunctionCall<TransactionReceipt> close() {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_CLOSE, 
+                Arrays.<Type>asList(), 
+                Collections.<TypeReference<?>>emptyList());
+        return executeRemoteCallTransaction(function);
+    }
+
+    public RemoteFunctionCall<TransactionReceipt> coverShortfall() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
+                FUNC_COVERSHORTFALL, 
                 Arrays.<Type>asList(), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);

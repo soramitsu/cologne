@@ -4,11 +4,7 @@
   "private": true,
   "main": "server.js",
   "scripts": {
-    "dev": "npm-run-all --parallel watch:server start:dev",
-    "start": "npm-run-all --parallel watch:server watch:client",
-    "start:dev": "webpack-dev-server --color --progress",
-    "watch:client": "webpack --watch --config webpack.config.js",
-    "watch:server": "nodemon --watch server --exec babel-node -- server/index.js",
+    "start": "webpack-dev-server --color --progress",
     "build": "webpack --config prod.config.js --env.prod=true && babel server -d dist && cp server/index.html dist/index.html && cp -a server/mails dist/mails"
   },
   "dependencies": {
