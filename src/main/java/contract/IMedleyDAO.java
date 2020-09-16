@@ -54,6 +54,8 @@ public class IMedleyDAO extends Contract {
 
     public static final String FUNC_MINTEAU = "mintEAU";
 
+    public static final String FUNC_MINTMDLY = "mintMDLY";
+
     public static final Event VAULTCREATION_EVENT = new Event("VaultCreation", 
             Arrays.<TypeReference<?>>asList(new TypeReference<Address>(true) {}, new TypeReference<Address>(true) {}));
     ;
@@ -166,6 +168,15 @@ public class IMedleyDAO extends Contract {
     public RemoteFunctionCall<TransactionReceipt> mintEAU(String beneficiary, BigInteger amount) {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_MINTEAU, 
+                Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, beneficiary), 
+                new org.web3j.abi.datatypes.generated.Uint256(amount)), 
+                Collections.<TypeReference<?>>emptyList());
+        return executeRemoteCallTransaction(function);
+    }
+
+    public RemoteFunctionCall<TransactionReceipt> mintMDLY(String beneficiary, BigInteger amount) {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
+                FUNC_MINTMDLY, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, beneficiary), 
                 new org.web3j.abi.datatypes.generated.Uint256(amount)), 
                 Collections.<TypeReference<?>>emptyList());

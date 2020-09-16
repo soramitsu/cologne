@@ -51,6 +51,11 @@ contract MedleyDAO is IMedleyDAO {
         _eauToken.mint(beneficiary, amount);
     }
 
+    function mintMDLY(address beneficiary, uint amount) external override {
+        require(_isVault[msg.sender], "Only vault can mint MDLY");
+        _mdlyToken.mint(beneficiary, amount);
+    }
+
     function getMdlyTokenAddress() public view override returns (address) {
         return address(_mdlyToken);
     }

@@ -181,7 +181,6 @@ contract Vault is IVault, Ownable {
     function slash() notClosed initialAuctionIsOver public override {
         // determine amount MDLY to sell
         uint debt = getTotalDebt();
-        // TODO market getAmountsIn
 
         address[] memory path = new address[](2);
         path[0] = address(_mdlyToken);
@@ -209,7 +208,6 @@ contract Vault is IVault, Ownable {
         uint eauToBuy = amounts[1];
         if (eauToBuy > debt)
             eauToBuy = debt;
-        _mdlyToken.approve(address(_medleyDao.getMdlyMarket()), mdlyToSell);
         uint eauLeftover = _sellMdlyForEau(mdlyToSell, eauToBuy);
         _collateral -= mdlyToSell;
 
@@ -234,11 +232,19 @@ contract Vault is IVault, Ownable {
 
     function coverShortfall() notClosed initialAuctionIsOver public override {
         require(_collateral == 0, "Cover shortfall: can be called only after slashing");
-        // TODO check caller
-        // calculate debt and amount to mint
-        // mint MDLY
-        // sell MDLY for EAU
-        // reward callerMDLY
+
+        uint debt = getTotalDebt();
+        uint mdlyHolderBalanceInEau = _medleyDao.getMdlyPriceOracle().consult(address(_mdlyToken), _mdlyToken.balanceOf(msg.sender));
+        require(mdlyHolderBalanceInEau >= debt.div(20), "Only MDLY holder with at least 5% of remaining outstanding EAU debt can initiate a MDLY mint");
+
+        uint bounty = debt.div(10);
+        uint mdlyToMint = _medleyDao.getMdlyPriceOracle().consult(address(_eauToken), debt.add(bounty));
+        _medleyDao.mintMDLY(address(this), mdlyToMint);
+        _sellMdlyForEau(mdlyToMint, debt.add(bounty));
+        _eauToken.burn(debt);
+        _principal = 0;
+        _debtUpdateTime = _timeProvider.getTime();
+        require(_eauToken.transfer(msg.sender, bounty), "Vault::coverShortfall(): cannot transfer EAU bounty.");
     }
 
 
@@ -423,6 +429,8 @@ contract Vault is IVault, Ownable {
      * Sell as few mdly as possible to get exact amount of eau
      */
     function _sellMdlyForEau(uint maxMdlyAmount, uint exactEauAmount) private returns (uint bought) {
+        _mdlyToken.approve(address(_medleyDao.getMdlyMarket()), maxMdlyAmount);
+
         address[] memory path = new address[](2);
         path[0] = address(_mdlyToken);
         path[1] = address(_eauToken);
