@@ -297,6 +297,13 @@ contract Vault is IVault, Ownable {
     }
 
     /**
+     * Get user token amount
+     */
+    function getTokenAmount() public view override returns (uint) {
+        return _tokenAmount;
+    }
+
+    /**
      * Get MDLY collateral in EAU
      */
     function getCollateralInEau() public view override returns (uint) {

@@ -75,6 +75,7 @@ class VaultTest {
         assertEquals(BigInteger.ZERO, userToken.balanceOf(owner).send())
         assertEquals(tokenPrice, vault.price.send())
         assertEquals(BigInteger.valueOf(50), vault.creditLimit.send())
+        assertEquals(initialAmount, vault.tokenAmount.send())
     }
 
     /**

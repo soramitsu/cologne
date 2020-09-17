@@ -40,7 +40,11 @@ interface IVault {
     // calculate fees over time
     function getFees(uint time) external view returns (uint);
 
+    // Returns User Token price in EAU
     function getPrice() external view returns (uint);
+
+    // Returns remaining User Token amount of vault
+    function getTokenAmount() external view returns (uint);
 
     function getCollateralInEau() external view returns (uint);
 
