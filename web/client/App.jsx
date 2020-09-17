@@ -1,5 +1,5 @@
 /* eslint-disable react/no-children-prop */
-import 'semantic-ui-css/semantic.min.css'
+import "semantic-ui-css/semantic.min.css";
 
 import React from "react";
 import {render} from "react-dom";
@@ -23,4 +23,3 @@ const renderApp = () => {
 store.subscribe(renderApp);
 
 renderApp();
-

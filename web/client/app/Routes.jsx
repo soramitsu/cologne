@@ -19,7 +19,6 @@ const Routes = (
       <AuthorizedLayout path="/main">
         <MainPage />
       </AuthorizedLayout>
-
     </Switch>
   </AppWrapper>
 );

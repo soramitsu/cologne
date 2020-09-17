@@ -7,14 +7,14 @@ import store from "../redux/Store";
  * @param parameterName
  * @returns {*}
  */
-export const findGetParameter = parameterName => {
+export const findGetParameter = (parameterName) => {
   let result = null;
   let tmp = [];
 
   location.search
     .substr(1)
     .split("&")
-    .forEach(item => {
+    .forEach((item) => {
       tmp = item.split("=");
       if (tmp[0] === parameterName) {
         result = decodeURIComponent(tmp[1]);
@@ -38,5 +38,5 @@ export const engFormatter = new Intl.NumberFormat("en-US", {
   currencyDisplay: "symbol",
 });
 
-export const beforePriceShown = number =>
+export const beforePriceShown = (number) =>
   store.getState().lang.formatter.format(number);
