@@ -1,7 +1,7 @@
 package acceptance
 
 import contract.EAUToken
-import contract.MDLYToken
+import contract.CLGNToken
 import contract.UserToken
 import contract.Vault
 import helpers.ContractTestHelper
@@ -42,7 +42,7 @@ class CloseOutAcceptanceTest {
     lateinit var eauToken: EAUToken
     lateinit var buyerEAUToken: EAUToken
     lateinit var buyerVault: Vault
-    lateinit var mdlyToken: MDLYToken
+    lateinit var clgnToken: CLGNToken
 
     @BeforeEach
     fun setUp() {
@@ -57,7 +57,7 @@ class CloseOutAcceptanceTest {
         eauToken =
             EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsSeed, helper.gasProvider)
         buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
-        mdlyToken = helper.mdlyToken
+        clgnToken = helper.clgnToken
     }
 
     /**
@@ -244,9 +244,9 @@ class CloseOutAcceptanceTest {
         val costInEau = toBuy.multiply(price)
         eauToken.mint(buyer.address, costInEau).send()
         assertEquals(true, vault.isLimitBreached.send())
-        // add MDLY to swap for penalty
-        val penaltyInMdly = toBuy.div(BigInteger.TEN).div(helper.mdlyEauPrice)
-        mdlyToken.mint(helper.marketAdaptor.contractAddress, penaltyInMdly).send()
+        // add CLGN to swap for penalty
+        val penaltyInClgn = toBuy.div(BigInteger.TEN).div(helper.clgnEauPrice)
+        helper.addCLGN(helper.marketAdaptor.contractAddress, penaltyInClgn)
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         buyerVault.buy(toBuy, price, buyer.address).send()
@@ -260,12 +260,12 @@ class CloseOutAcceptanceTest {
 
     /**
      * @given A breached vault with close-out process started. The vault has 8000 TKN and debt is 2000 EAU and price is
-     * 1 TKN/EAU and MDLY/EAU price = 2.
+     * 1 TKN/EAU and CLGN/EAU price = 2.
      * @when a buyer buys 2000 TKN for 2000 EAU
-     * @then the penalty is 200 EAU (10%) used to buy 100 MDLY
-     * - 33 MDLY goes to the initator
-     * - 33 MDLY goes to buyer
-     * - 34 MDLY burnt
+     * @then the penalty is 200 EAU (10%) used to buy 100 CLGN
+     * - 33 CLGN goes to the initator
+     * - 33 CLGN goes to buyer
+     * - 34 CLGN burnt
      */
     @Test
     fun distributeBounty() {
@@ -276,16 +276,16 @@ class CloseOutAcceptanceTest {
         ownerCreatesVault(amount = BigInteger.valueOf(8000), price = price)
         breachVault()
         intiatorVault.startInitialLiquidityAuction().send()
-        // add MDLY to swap for penalty
-        val penaltyInMdly = toBuy.div(BigInteger.TEN).div(helper.mdlyEauPrice)
-        mdlyToken.mint(helper.marketAdaptor.contractAddress, penaltyInMdly).send()
-        val mdlySupply = mdlyToken.totalSupply().send()
+        // add CLGN to swap for penalty
+        val penaltyInClgn = toBuy.div(BigInteger.TEN).div(helper.clgnEauPrice)
+        helper.addCLGN(helper.marketAdaptor.contractAddress, penaltyInClgn)
+        val clgnSupply = clgnToken.totalSupply().send()
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         buyerVault.buy(toBuy, price, buyer.address).send()
 
-        assertEquals(BigInteger.valueOf(33), mdlyToken.balanceOf(intitator.address).send())
-        assertEquals(BigInteger.valueOf(33), mdlyToken.balanceOf(buyer.address).send())
-        assertEquals(mdlySupply.minus(BigInteger.valueOf(34)), mdlyToken.totalSupply().send())
+        assertEquals(BigInteger.valueOf(33), clgnToken.balanceOf(intitator.address).send())
+        assertEquals(BigInteger.valueOf(33), clgnToken.balanceOf(buyer.address).send())
+        assertEquals(clgnSupply.minus(BigInteger.valueOf(34)), clgnToken.totalSupply().send())
     }
 }

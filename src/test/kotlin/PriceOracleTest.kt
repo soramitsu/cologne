@@ -26,34 +26,34 @@ class PriceOracleTest {
 
     lateinit var helper: ContractTestHelper
     lateinit var priceOracle: PriceOracleMock
-    lateinit var mdly: String
+    lateinit var clgn: String
     lateinit var eau: String
 
     @BeforeEach
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
         priceOracle = helper.priceOracle
-        mdly = helper.mdlyToken.contractAddress
+        clgn = helper.clgnToken.contractAddress
         eau = helper.eauToken.contractAddress
     }
 
     /**
-     * @given Price oracle with rate MDLY/EAU = 2
-     * @when get assessed value for 10 MDLY
+     * @given Price oracle with rate CLGN/EAU = 2
+     * @when get assessed value for 10 CLGN
      * @then 20 EAU returned
      */
     @Test
-    fun testMdlyToEauRate() {
-        assertEquals(BigInteger.valueOf(20), priceOracle.consult(mdly, BigInteger.TEN).send())
+    fun testClgnToEauRate() {
+        assertEquals(BigInteger.valueOf(20), priceOracle.consult(clgn, BigInteger.TEN).send())
     }
 
     /**
-     * @given Price oracle with rate MDLY/EAU = 2
+     * @given Price oracle with rate CLGN/EAU = 2
      * @when get assessed value for 10 EAU
-     * @then 5 MDLY returned
+     * @then 5 CLGN returned
      */
     @Test
-    fun testEauToMdlyRate() {
+    fun testEauToClgnRate() {
         assertEquals(BigInteger.valueOf(5), priceOracle.consult(eau, BigInteger.TEN).send())
     }
 

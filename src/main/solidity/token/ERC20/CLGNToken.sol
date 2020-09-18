@@ -4,14 +4,17 @@ pragma solidity ^0.7.0;
 
 import "./ERC20.sol";
 import "./IMintableBurnableERC20.sol";
+import "./../../utils/Ownable.sol";
 
-contract MDLYToken is ERC20, IMintableBurnableERC20 {
+contract CLGNToken is ERC20, IMintableBurnableERC20, Ownable {
     using SafeMath for uint256;
 
-    constructor() ERC20("Test MDLY token", "TEST_MDLY") {
+    constructor() ERC20("Test CLGN token", "TEST_CLGN") Ownable(_msgSender()) {
+        // initial amount is 22,5 kk
+        _mint(owner(), 22500000 * 10 ** decimals());
     }
 
-    function mint(address account, uint256 value) external override {
+    function mint(address account, uint256 value) onlyOwner external override {
         _mint(account, value);
     }
 

@@ -27,7 +27,7 @@ class VaultTest {
     lateinit var medleyDAO: MedleyDAO
     lateinit var owner: String
     lateinit var userToken: UserToken
-    lateinit var mdlyToken: MDLYToken
+    lateinit var clgnToken: CLGNToken
     lateinit var eauToken: EAUToken
     val stake = BigInteger.valueOf(20)
     val initialAmount = BigInteger.valueOf(100)
@@ -44,9 +44,9 @@ class VaultTest {
         // load UserToken with owner credentials
         userToken =
             UserToken.load(helper.userToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
-        // load MDLY token with owner credentials
-        mdlyToken =
-            MDLYToken.load(helper.mdlyToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+        // load CLGN token with owner credentials
+        clgnToken =
+            CLGNToken.load(helper.clgnToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
         // load EAU token with owner credentials
         eauToken =
             EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
@@ -100,9 +100,9 @@ class VaultTest {
     }
 
     /**
-     * @given Vault deployed and has user tokens, MDLY and EAU and has no debt
+     * @given Vault deployed and has user tokens, CLGN and EAU and has no debt
      * @when the owner closes vault
-     * @then all assets (user tokens left in vault, EAU and MDLY stake and MDLY assets transferred from the vault to the
+     * @then all assets (user tokens left in vault, EAU and CLGN stake and CLGN assets transferred from the vault to the
      * owner, vault is closed
      */
     @Test
@@ -110,14 +110,14 @@ class VaultTest {
         ownerCreatesVault(initialAmount, tokenPrice)
         val eauBalance = BigInteger.valueOf(123)
         eauToken.mint(vault.contractAddress, eauBalance).send()
-        val mdlyBalance = BigInteger.valueOf(234)
-        mdlyToken.mint(vault.contractAddress, mdlyBalance).send()
+        val clgnBalance = BigInteger.valueOf(234)
+        helper.addCLGN(vault.contractAddress, clgnBalance)
 
         vault.close().send()
 
         assertEquals(initialAmount, userToken.balanceOf(owner).send())
         assertEquals(eauBalance, eauToken.balanceOf(owner).send())
-        assertEquals(mdlyBalance.add(stake), mdlyToken.balanceOf(owner).send())
+        assertEquals(clgnBalance.add(stake), clgnToken.balanceOf(owner).send())
     }
 
     /**

@@ -21,7 +21,7 @@ interface IVault {
     function slash() external;
 
     /**
-     * Mint and sell MDLY on MDLY auction to cover shortfall
+     * Mint and sell CLGN on CLGN auction to cover shortfall
      */
     function coverShortfall() external;
 

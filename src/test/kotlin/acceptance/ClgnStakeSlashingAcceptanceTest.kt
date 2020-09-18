@@ -1,7 +1,7 @@
 package acceptance
 
 import contract.EAUToken
-import contract.MDLYToken
+import contract.CLGNToken
 import contract.Vault
 import helpers.ContractTestHelper
 import org.junit.jupiter.api.Assertions.*
@@ -18,7 +18,7 @@ import java.math.BigInteger
 import java.nio.file.Path
 
 @Testcontainers
-class MdlyStakeSlashingAcceptanceTest {
+class ClgnStakeSlashingAcceptanceTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
@@ -36,7 +36,7 @@ class MdlyStakeSlashingAcceptanceTest {
     lateinit var auctionInitiator: Credentials
     lateinit var slashingIntiator: Credentials
     lateinit var eauToken: EAUToken
-    lateinit var mdlyToken: MDLYToken
+    lateinit var clgnToken: CLGNToken
     lateinit var ownerVault: Vault
     lateinit var auctionIntiatorVault: Vault
     lateinit var slashingInitiatorVault: Vault
@@ -48,7 +48,7 @@ class MdlyStakeSlashingAcceptanceTest {
         auctionInitiator = helper.credentialsBob
         slashingIntiator = helper.credentialsCharlie
         eauToken = helper.eauToken
-        mdlyToken = helper.mdlyToken
+        clgnToken = helper.clgnToken
     }
 
     /**
@@ -127,31 +127,31 @@ class MdlyStakeSlashingAcceptanceTest {
     }
 
     /**
-     * @given the vault is breached and initial liquidity auction is over and stake is 1000 MDLY
+     * @given the vault is breached and initial liquidity auction is over and stake is 1000 CLGN
      * @when stake is slashed
      * @then penalty is distributed:
-     *  2,5% of stake (25 MDLY) goes to Initial Liquidity Auction initiator
-     *  2,5% of stake (25 MDLY) goes to slashing initiator
-     *  5% of stake (50 MDLY) is burned
+     *  2,5% of stake (25 CLGN) goes to Initial Liquidity Auction initiator
+     *  2,5% of stake (25 CLGN) goes to slashing initiator
+     *  5% of stake (50 CLGN) is burned
      */
     @Test
     fun slashBountyDistribution() {
         eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000)).send()
         ownerCreatesVault(amount = BigInteger.valueOf(16000), stake = BigInteger.valueOf(1000))
-        val initialMdlySupply = mdlyToken.totalSupply().send()
+        val initialClgnSupply = clgnToken.totalSupply().send()
         breachVault()
         auctionIntiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
 
         slashingInitiatorVault.slash().send()
 
-        assertEquals(BigInteger.valueOf(25), mdlyToken.balanceOf(auctionInitiator.address).send())
-        assertEquals(BigInteger.valueOf(25), mdlyToken.balanceOf(slashingIntiator.address).send())
-        assertEquals(initialMdlySupply.subtract(BigInteger.valueOf(50)), mdlyToken.totalSupply().send())
+        assertEquals(BigInteger.valueOf(25), clgnToken.balanceOf(auctionInitiator.address).send())
+        assertEquals(BigInteger.valueOf(25), clgnToken.balanceOf(slashingIntiator.address).send())
+        assertEquals(initialClgnSupply.subtract(BigInteger.valueOf(50)), clgnToken.totalSupply().send())
     }
 
     /**
-     * @given the vault has principal debt of 4000 EAU and some fee accrued and stake of 1000 MDLY (assessed as 2000
+     * @given the vault has principal debt of 4000 EAU and some fee accrued and stake of 1000 CLGN (assessed as 2000
      * EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off partially (1800 EAU paid off and 2200 is current debt) and fees are forgiven and
@@ -178,7 +178,7 @@ class MdlyStakeSlashingAcceptanceTest {
     }
 
     /**
-     * @given the vault has principal debt of 10000 EAU and fees accrued more then 2 EAU and stake of 5600 MDLY
+     * @given the vault has principal debt of 10000 EAU and fees accrued more then 2 EAU and stake of 5600 CLGN
      * (assessed as 11200 EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off (10000 EAU) and penalty paid off (10000 EAU) and fees paid off partially (100 EAU) and
@@ -204,11 +204,11 @@ class MdlyStakeSlashingAcceptanceTest {
     }
 
     /**
-     * @given the vault has principal debt of 10000 EAU and fees accrued are 1000 EAU and stake of 10000 MDLY
+     * @given the vault has principal debt of 10000 EAU and fees accrued are 1000 EAU and stake of 10000 CLGN
      * (assessed as 20000 EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off (10000 EAU) and penalty paid off (1010 EAU) and fees paid off (100 EAU) and stake
-     * leftover in EAU is 4445 MDLY (8890 EAU
+     * leftover in EAU is 4445 CLGN (8890 EAU
      */
     @Test
     fun slashCovered() {

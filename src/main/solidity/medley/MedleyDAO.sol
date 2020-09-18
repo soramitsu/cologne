@@ -6,7 +6,7 @@ import "./IMedleyDAO.sol";
 import "./Vault.sol";
 import "./../token/ERC20/IERC20.sol";
 import "./../token/ERC20/EAUToken.sol";
-import "./../token/ERC20/MDLYToken.sol";
+import "./../token/ERC20/CLGNToken.sol";
 import "./../market/IPriceOracle.sol";
 import "./../market/IMarketAdaptor.sol";
 import "./ITimeProvider.sol";
@@ -16,21 +16,21 @@ contract MedleyDAO is IMedleyDAO {
     // to check if address is registered vault
     mapping(address => bool) _isVault;
 
-    MDLYToken _mdlyToken;
+    CLGNToken _clgnToken;
     EAUToken _eauToken;
 
-    // MDLY/DAO price feed
-    IPriceOracle _mdlyPriceOracle;
+    // CLGN/DAO price feed
+    IPriceOracle _clgnPriceOracle;
 
-    IMarketAdaptor _mdlyMarket;
+    IMarketAdaptor _clgnMarket;
 
     ITimeProvider _timeProvider;
 
-    constructor(address mdlyToken, address eauToken, address mdlyPriceOracle, address mdlyMarket, address timeProvider) {
-        _mdlyToken = MDLYToken(mdlyToken);
+    constructor(address clgnToken, address eauToken, address clgnPriceOracle, address clgnMarket, address timeProvider) {
+        _clgnToken = CLGNToken(clgnToken);
         _eauToken = EAUToken(eauToken);
-        _mdlyPriceOracle = IPriceOracle(mdlyPriceOracle);
-        _mdlyMarket = IMarketAdaptor(mdlyMarket);
+        _clgnPriceOracle = IPriceOracle(clgnPriceOracle);
+        _clgnMarket = IMarketAdaptor(clgnMarket);
         _timeProvider = ITimeProvider(timeProvider);
     }
 
@@ -39,7 +39,7 @@ contract MedleyDAO is IMedleyDAO {
         IERC20 tokenContract = IERC20(token);
         require(tokenContract.transferFrom(msg.sender, vault, initialAmount),
             "MedleyDAO: Transfer of user tokens not allowed");
-        require(_mdlyToken.transferFrom(msg.sender, vault, stake), "MedleyDAO: Transfer of MDLY tokens not allowed");
+        require(_clgnToken.transferFrom(msg.sender, vault, stake), "MedleyDAO: Transfer of CLGN tokens not allowed");
         _vaults.push(vault);
         _isVault[vault] = true;
         emit VaultCreation(vault, msg.sender);
@@ -51,13 +51,13 @@ contract MedleyDAO is IMedleyDAO {
         _eauToken.mint(beneficiary, amount);
     }
 
-    function mintMDLY(address beneficiary, uint amount) external override {
-        require(_isVault[msg.sender], "Only vault can mint MDLY");
-        _mdlyToken.mint(beneficiary, amount);
+    function mintCLGN(address beneficiary, uint amount) external override {
+        require(_isVault[msg.sender], "Only vault can mint CLGN");
+        _clgnToken.mint(beneficiary, amount);
     }
 
-    function getMdlyTokenAddress() public view override returns (address) {
-        return address(_mdlyToken);
+    function getClgnTokenAddress() public view override returns (address) {
+        return address(_clgnToken);
     }
 
     function getEauTokenAddress() public view override returns (address) {
@@ -68,11 +68,11 @@ contract MedleyDAO is IMedleyDAO {
         return _vaults;
     }
 
-    function getMdlyPriceOracle() external view override returns (IPriceOracle) {
-        return _mdlyPriceOracle;
+    function getClgnPriceOracle() external view override returns (IPriceOracle) {
+        return _clgnPriceOracle;
     }
 
-    function getMdlyMarket() external view override returns (IMarketAdaptor) {
-        return _mdlyMarket;
+    function getClgnMarket() external view override returns (IMarketAdaptor) {
+        return _clgnMarket;
     }
 }
