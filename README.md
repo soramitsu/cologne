@@ -10,8 +10,16 @@ brew install solidity
 brew tap web3j/web3j
 brew install web3j
 ```
-Now run
+If you don't have gradle installed, install it:
+
+```
+brew install gradle
+```
+
+Then run 
+
 ```
 gradle generateEthereumContractsBindings
 ```
+
 to build Solidity code and generate Java bindings

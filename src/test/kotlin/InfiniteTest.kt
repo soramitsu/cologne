@@ -13,7 +13,6 @@ import java.nio.file.Path
  */
 @Testcontainers
 class InfiniteTest {
-
     @Container
     private val ganache: GenericContainer<Nothing> =
         GenericContainer<Nothing>(
