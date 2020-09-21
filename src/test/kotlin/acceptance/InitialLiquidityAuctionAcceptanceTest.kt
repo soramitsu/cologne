@@ -20,7 +20,7 @@ import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
 
 @Testcontainers
-class CloseOutAcceptanceTest {
+class InitialLiquidityAuctionAcceptanceTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
