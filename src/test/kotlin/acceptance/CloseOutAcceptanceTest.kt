@@ -5,6 +5,7 @@ import contract.CLGNToken
 import contract.UserToken
 import contract.Vault
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -135,21 +136,27 @@ class CloseOutAcceptanceTest {
         val price = BigInteger.valueOf(100000)
         ownerCreatesVault(price = price)
         breachVault()
+        assertEquals(VaultState.Defaulted.toBigInteger(), vault.state.send())
         intiatorVault.startInitialLiquidityAuction().send()
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
 
         assertEquals(price, vault.price.send())
 
         helper.passTime(timeInterval)
         assertEquals(BigInteger.valueOf(99000), vault.price.send())
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
 
         helper.passTime(timeInterval)
         assertEquals(BigInteger.valueOf(98000), vault.price.send())
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
 
         helper.passTime(timeInterval.multiply(BigInteger.valueOf(97)))
         assertEquals(BigInteger.valueOf(1000), vault.price.send())
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
 
         helper.passTime(timeInterval)
         assertEquals(BigInteger.ZERO, vault.price.send())
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), vault.state.send())
     }
 
     /**

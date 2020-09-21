@@ -9,6 +9,17 @@ import org.web3j.tx.gas.StaticGasProvider
 import java.math.BigInteger
 
 /**
+ * Vault states
+ */
+enum class VaultState {
+    Trading, Defaulted, InitialLiquidityAuctionInProcess, WaitingForSlashing, WaitingForClgnAuction, Slashed, Closed;
+
+    fun toBigInteger(): BigInteger {
+        return BigInteger.valueOf(this.ordinal.toLong())
+    }
+}
+
+/**
  * Creates credentials and deploy contracts
  */
 class ContractTestHelper(host: String, port: Int) {

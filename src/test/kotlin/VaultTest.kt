@@ -1,5 +1,6 @@
 import contract.*
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -70,6 +71,7 @@ class VaultTest {
     fun createVault() {
         ownerCreatesVault(initialAmount, tokenPrice)
 
+        assertEquals(VaultState.Trading.toBigInteger(), vault.state.send())
         assertEquals(owner, vault.owner().send())
         assertEquals(initialAmount, userToken.balanceOf(vault.contractAddress).send())
         assertEquals(BigInteger.ZERO, userToken.balanceOf(owner).send())
@@ -115,6 +117,7 @@ class VaultTest {
 
         vault.close().send()
 
+        assertEquals(VaultState.Closed.toBigInteger(), vault.state.send())
         assertEquals(initialAmount, userToken.balanceOf(owner).send())
         assertEquals(eauBalance, eauToken.balanceOf(owner).send())
         assertEquals(clgnBalance.add(stake), clgnToken.balanceOf(owner).send())
@@ -131,6 +134,7 @@ class VaultTest {
         val toBorrow = BigInteger.TEN
         vault.borrow(toBorrow).send()
 
+        assertEquals(VaultState.Defaulted.toBigInteger(), vault.state.send())
         assertThrows<TransactionException> {
             vault.close().send()
         }

@@ -4,6 +4,7 @@ import contract.EAUToken
 import contract.CLGNToken
 import contract.Vault
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -142,6 +143,7 @@ class ClgnStakeSlashingAcceptanceTest {
         breachVault()
         auctionIntiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), ownerVault.state.send())
 
         slashingInitiatorVault.slash().send()
 

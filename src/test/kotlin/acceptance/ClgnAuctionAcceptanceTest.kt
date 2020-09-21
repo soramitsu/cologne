@@ -4,6 +4,7 @@ import contract.EAUToken
 import contract.CLGNToken
 import contract.Vault
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -164,11 +165,16 @@ class ClgnAuctionAcceptanceTest {
         assertEquals(BigInteger.ZERO, ownerVault.fees.send())
         assertEquals(BigInteger.valueOf(1000), ownerVault.principal.send())
         val initialClgnSupply = clgnToken.totalSupply().send()
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), ownerVault.state.send())
+        slashingInitiatorVault.slash().send()
+        assertEquals(VaultState.WaitingForClgnAuction.toBigInteger(), ownerVault.state.send())
 
         coverInitiatorVault.coverShortfall().send()
 
+        assertEquals(VaultState.Slashed.toBigInteger(), ownerVault.state.send())
         assertEquals(BigInteger.valueOf(550), clgnToken.totalSupply().send().subtract(initialClgnSupply))
         assertEquals(BigInteger.ZERO, ownerVault.getTotalDebt().send())
         assertEquals(BigInteger.valueOf(100), eauToken.balanceOf(coverInitiator.address).send())
+        assertEquals(VaultState.Slashed.toBigInteger(), ownerVault.state.send())
     }
 }

@@ -16,8 +16,7 @@ contract Vault is IVault, Ownable {
     using SafeMath for uint;
 
     // Types of accounting records
-    uint constant kDeposit = 1;
-    uint constant kWithdrowal = 2;
+    enum AccountingRecordType {Deposit, Withdrawal}
 
     struct AccountingRecord {
         uint recordType;
@@ -55,7 +54,13 @@ contract Vault is IVault, Ownable {
     uint _closeOutTime = 0;
     address _closeOutInitiator;
 
+    bool _slashed = false;
     bool _closed = false;
+
+    modifier notSlashed() {
+        require(!_slashed, "Vault is slashed");
+        _;
+    }
 
     modifier notClosed {
         require(!_closed, "Vault is closed");
@@ -86,7 +91,7 @@ contract Vault is IVault, Ownable {
         _stake(stake);
     }
 
-    function buy(uint amount, uint maxPrice, address to) notClosed public override {
+    function buy(uint amount, uint maxPrice, address to) notClosed notSlashed public override {
         require(amount <= _token.balanceOf(address(this)), "Vault::buy(): Not enough tokens to sell");
         uint price = getPrice();
         require(price > 0, "Vault::buy(): Initial Liquidity Auction is over");
@@ -121,19 +126,19 @@ contract Vault is IVault, Ownable {
         emit Purchase(amount, price, to);
     }
 
-    function borrow(uint amount) notClosed onlyOwner public override {
+    function borrow(uint amount) notClosed notSlashed onlyOwner public override {
         require(amount <= getCreditLimit(), "Credit limit is exhausted ");
 
         _medleyDao.mintEAU(owner(), amount);
         _principal += amount;
         _debtUpdateTime = _timeProvider.getTime();
-        _recordAccounting(kWithdrowal, amount, _debtUpdateTime);
+        _recordAccounting(AccountingRecordType.Withdrawal, amount, _debtUpdateTime);
     }
 
-    function payOff(uint amount) notClosed public override {
+    function payOff(uint amount) notClosed notSlashed public override {
         require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
 
-        _recordAccounting(kDeposit, amount, _timeProvider.getTime());
+        _recordAccounting(AccountingRecordType.Deposit, amount, _timeProvider.getTime());
         _debtUpdateTime = _timeProvider.getTime();
 
         uint leftover = _payOffFees(amount);
@@ -167,9 +172,9 @@ contract Vault is IVault, Ownable {
         _closed = true;
     }
 
-    function startInitialLiquidityAuction() notClosed public override {
+    function startInitialLiquidityAuction() notClosed notSlashed public override {
         require(isLimitBreached(), "Vault::startInitialLiquidityAuction(): credit limit is not breached");
-        require(_closeOutTime == 0, "Vault::startInitialLiquidityAuction(): close-out already called");
+        require(_closeOutTime == 0, "Vault::startInitialLiquidityAuction(): close-out already initiated");
 
         _closeOutTime = _timeProvider.getTime();
         _closeOutInitiator = msg.sender;
@@ -178,7 +183,7 @@ contract Vault is IVault, Ownable {
         _debtUpdateTime = _timeProvider.getTime();
     }
 
-    function slash() notClosed initialAuctionIsOver public override {
+    function slash() notClosed notSlashed initialAuctionIsOver public override {
         // determine amount CLGN to sell
         uint debt = getTotalDebt();
 
@@ -228,12 +233,14 @@ contract Vault is IVault, Ownable {
 
         // forgive fees
         _feeAccrued = 0;
+        _slashed = true;
     }
 
     function coverShortfall() notClosed initialAuctionIsOver public override {
-        require(_collateral == 0, "Cover shortfall: can be called only after slashing");
+        require(_slashed, "Cover shortfall: can be called only after slashing");
 
         uint debt = getTotalDebt();
+        require(debt > 0, "Cover shortfall: no shortfall to cover");
         uint clgnHolderBalanceInEau = _medleyDao.getClgnPriceOracle().consult(address(_clgnToken), _clgnToken.balanceOf(msg.sender));
         require(clgnHolderBalanceInEau >= debt.div(20), "Only CLGN holder with at least 5% of remaining outstanding EAU debt can initiate a CLGN mint");
 
@@ -310,10 +317,17 @@ contract Vault is IVault, Ownable {
         return _medleyDao.getClgnPriceOracle().consult(address(_clgnToken), _collateral);
     }
 
-    function getState() public view override {
+    function getState() public view override returns (VaultState) {
+        if (_closed) return VaultState.Closed;
+        if (_slashed && (getTotalDebt() != 0)) return VaultState.WaitingForClgnAuction;
+        if (_slashed) return VaultState.Slashed;
+        if (_closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000)) return VaultState.WaitingForSlashing;
+        if (isLimitBreached() && _closeOutTime != 0) return VaultState.InitialLiquidityAuctionInProcess;
+        if (isLimitBreached() && _closeOutTime == 0) return VaultState.Defaulted;
+        return VaultState.Trading;
     }
 
-    function _recordAccounting(uint recordType, uint amount, uint time) private {
+    function _recordAccounting(AccountingRecordType recordType, uint amount, uint time) private {
         // TODO implement
     }
 
