@@ -34,12 +34,10 @@ contract MedleyDAO is IMedleyDAO {
         _timeProvider = ITimeProvider(timeProvider);
     }
 
-    function createVault(address token, uint stake, uint initialAmount, uint tokenPrice) external override returns (address) {
-        address vault = address(new Vault(msg.sender, stake, token, initialAmount, tokenPrice, _timeProvider));
+    function createVault(address token, uint initialAmount, uint tokenPrice) external override returns (address) {
+        address vault = address(new Vault(msg.sender, token, initialAmount, tokenPrice, _timeProvider));
         IERC20 tokenContract = IERC20(token);
-        require(tokenContract.transferFrom(msg.sender, vault, initialAmount),
-            "MedleyDAO: Transfer of user tokens not allowed");
-        require(_clgnToken.transferFrom(msg.sender, vault, stake), "MedleyDAO: Transfer of CLGN tokens not allowed");
+        require(tokenContract.transferFrom(msg.sender, vault, initialAmount), "MedleyDAO: Transfer of user tokens not allowed");
         _vaults.push(vault);
         _isVault[vault] = true;
         emit VaultCreation(vault, msg.sender);

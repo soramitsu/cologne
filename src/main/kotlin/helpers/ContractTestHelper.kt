@@ -100,14 +100,12 @@ class ContractTestHelper(host: String, port: Int) {
     /**
      * Creates vault with owner provided by credentials
      * @param owner - the owner of vault
-     * @param stakeAmount - stake in CLGN
      * @param userTokenAmount - amount of user tokens
      * @param userTokenPrice - price of user tokens in EAU
      * @return vault address
      */
     fun createVault(
         owner: Credentials,
-        stakeAmount: BigInteger,
         userTokenAmount: BigInteger,
         userTokenPrice: BigInteger
     ): String {
@@ -116,18 +114,24 @@ class ContractTestHelper(host: String, port: Int) {
         val tokenByOwner = UserToken.load(userToken.contractAddress, web3, owner, gasProvider)
         tokenByOwner.approve(medleyDAO.contractAddress, userTokenAmount).send()
 
-        clgnToken.transfer(owner.address, stakeAmount).send()
         val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, web3, owner, gasProvider)
-        clgnTokenByOwner.approve(medleyDAO.contractAddress, stakeAmount).send()
 
         val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
         val tx =
-            medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
+            medleyDaoByOwner.createVault(userToken.contractAddress, userTokenAmount, userTokenPrice).send()
         val vaultAddress = medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
 
         vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
 
         return vaultAddress
+    }
+
+    fun stake(vaultAddress: String, owner: Credentials, amount: BigInteger) {
+        clgnToken.transfer(owner.address, amount).send()
+        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, web3, owner, gasProvider)
+        clgnTokenByOwner.approve(medleyDAO.contractAddress, amount).send()
+        vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
+        vaultByOwner.stake(amount).send()
     }
 
     /**

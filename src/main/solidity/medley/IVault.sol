@@ -29,6 +29,12 @@ interface IVault {
         Closed
     }
 
+    /**
+     * Stake CLGN on Vault
+     * @param amount - amount of CLGN to stake
+     */
+    function stake(uint amount) external;
+
     function buy(uint amount, uint maxPrice, address to) external;
 
     function borrow(uint amount) external;

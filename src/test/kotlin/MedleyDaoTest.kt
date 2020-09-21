@@ -40,7 +40,7 @@ class MedleyDaoTest {
     fun createVault() {
         assertEquals(0, medleyDAO.listVaults().send().size)
 
-        val vault = helper.createVault(helper.credentialsAlice, BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO)
+        val vault = helper.createVault(helper.credentialsAlice, BigInteger.ZERO, BigInteger.ZERO)
 
         val vaults = medleyDAO.listVaults().send()
         assertEquals(1, vaults.size)

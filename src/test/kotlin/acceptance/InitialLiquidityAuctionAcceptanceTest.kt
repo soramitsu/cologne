@@ -66,7 +66,7 @@ class InitialLiquidityAuctionAcceptanceTest {
      */
     fun ownerCreatesVault(amount: BigInteger = initialAmount, price: BigInteger = tokenPrice) {
         val stake = BigInteger.valueOf(20)
-        val vaultAddress = helper.createVault(owner, stake, amount, price)
+        val vaultAddress = helper.createVault(owner, amount, price)
         vault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
         intiatorVault = Vault.load(vault.contractAddress, helper.web3, intitator, helper.gasProvider)
         buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)

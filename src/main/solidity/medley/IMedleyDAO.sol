@@ -10,11 +10,10 @@ interface IMedleyDAO {
      * Create vault and transfer tokens.
      * Transfer should be allowed to MedleyDAO contract
      * @param token - user token address
-     * @param stake - amount of CLGN token to stake
      * @param initialAmount - user token amount
      * @param tokenPrice - price of one user token in EAU
      */
-    function createVault(address token, uint stake, uint initialAmount, uint tokenPrice) external returns (address);
+    function createVault(address token, uint initialAmount, uint tokenPrice) external returns (address);
 
     function mintEAU(address beneficiary, uint amount) external;
 

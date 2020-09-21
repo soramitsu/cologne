@@ -111,11 +111,10 @@ public class IMedleyDAO extends Contract {
         return vaultCreationEventFlowable(filter);
     }
 
-    public RemoteFunctionCall<TransactionReceipt> createVault(String token, BigInteger stake, BigInteger initialAmount, BigInteger tokenPrice) {
+    public RemoteFunctionCall<TransactionReceipt> createVault(String token, BigInteger initialAmount, BigInteger tokenPrice) {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_CREATEVAULT, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, token), 
-                new org.web3j.abi.datatypes.generated.Uint256(stake), 
                 new org.web3j.abi.datatypes.generated.Uint256(initialAmount), 
                 new org.web3j.abi.datatypes.generated.Uint256(tokenPrice)), 
                 Collections.<TypeReference<?>>emptyList());

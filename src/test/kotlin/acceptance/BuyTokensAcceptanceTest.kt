@@ -54,8 +54,7 @@ class BuyTokensAcceptanceTest {
      * Deploy vault with Owner credentials
      */
     fun ownerCreatesVault(amount: BigInteger = initialAmount) {
-        val stake = BigInteger.valueOf(20)
-        val vaultAddress = helper.createVault(helper.credentialsAlice, stake, amount, tokenPrice)
+        val vaultAddress = helper.createVault(helper.credentialsAlice, amount, tokenPrice)
         vault = Vault.load(vaultAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
         buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
     }

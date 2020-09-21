@@ -2,6 +2,7 @@ package acceptance
 
 import contract.EAUToken
 import contract.CLGNToken
+import contract.UserToken
 import contract.Vault
 import helpers.ContractTestHelper
 import helpers.VaultState
@@ -60,11 +61,17 @@ class ClgnStakeSlashingAcceptanceTest {
         price: BigInteger = tokenPrice,
         stake: BigInteger = initialStake
     ) {
-        val vaultAddress = helper.createVault(owner, stake, amount, price)
+        val vaultAddress = helper.createVault(owner, amount, price)
         ownerVault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
         auctionIntiatorVault = Vault.load(ownerVault.contractAddress, helper.web3, auctionInitiator, helper.gasProvider)
         slashingInitiatorVault =
             Vault.load(ownerVault.contractAddress, helper.web3, slashingIntiator, helper.gasProvider)
+
+        // Stake
+        helper.addCLGN(owner.address, stake)
+        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, helper.web3, owner, helper.gasProvider)
+        clgnTokenByOwner.approve(ownerVault.contractAddress, stake).send()
+        ownerVault.stake(stake).send()
     }
 
     /**

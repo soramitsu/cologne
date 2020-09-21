@@ -75,7 +75,6 @@ contract Vault is IVault, Ownable {
 
     constructor(
         address owner,
-        uint stake,
         address token,
         uint initialAmount,
         uint tokenPrice,
@@ -88,7 +87,10 @@ contract Vault is IVault, Ownable {
         _price = tokenPrice;
         _timeProvider = timeProvider;
         _debtUpdateTime = _timeProvider.getTime();
-        _stake(stake);
+    }
+
+    function stake(uint amount) notClosed public override {
+        _stake(amount);
     }
 
     function buy(uint amount, uint maxPrice, address to) notClosed notSlashed public override {
@@ -335,6 +337,7 @@ contract Vault is IVault, Ownable {
      * Adds CLGN to stake
      */
     function _stake(uint clgnAmount) private {
+        require(_clgnToken.transferFrom(msg.sender, address(this), clgnAmount), "Vault::stake: cannot transfer ClGN.");
         _collateral = _collateral + clgnAmount;
     }
 

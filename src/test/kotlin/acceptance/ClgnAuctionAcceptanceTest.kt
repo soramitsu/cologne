@@ -63,7 +63,7 @@ class ClgnAuctionAcceptanceTest {
         price: BigInteger = tokenPrice,
         stake: BigInteger = initialStake
     ) {
-        val vaultAddress = helper.createVault(owner, stake, amount, price)
+        val vaultAddress = helper.createVault(owner, amount, price)
         ownerVault = helper.vaultByOwner
         auctionIntiatorVault = Vault.load(vaultAddress, helper.web3, auctionInitiator, helper.gasProvider)
         slashingInitiatorVault = Vault.load(vaultAddress, helper.web3, slashingInitiator, helper.gasProvider)
