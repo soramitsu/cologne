@@ -1,3 +1,4 @@
+import contract.EAUToken
 import helpers.ContractTestHelper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -27,13 +28,17 @@ class EAUTokenTest {
     lateinit var alice: String
     lateinit var bob: String
     lateinit var cashStash: String
+    lateinit var eauToken: EAUToken
+    lateinit var eauByAlice: EAUToken
 
     @BeforeEach
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
         alice = helper.credentialsAlice.address
         bob = helper.credentialsBob.address
-        cashStash = helper.eauToken.contractAddress
+        eauToken = EAUToken.deploy(helper.web3, helper.credentialsSeed, helper.gasProvider).send()
+        cashStash = eauToken.contractAddress
+        eauByAlice = EAUToken.load(eauToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
     }
 
     /**
@@ -44,17 +49,17 @@ class EAUTokenTest {
      */
     @Test
     fun testEAUDistribution() {
-        helper.addEAU(alice, BigInteger.valueOf(20))
-        helper.addEAU(bob, BigInteger.valueOf(10))
-        assertEquals(BigInteger.ZERO, helper.eauToken.balanceOf(cashStash).send())
+        eauToken.mint(alice, BigInteger.valueOf(20)).send()
+        eauToken.mint(bob, BigInteger.valueOf(10)).send()
+        assertEquals(BigInteger.ZERO, eauToken.balanceOf(cashStash).send())
 
-        helper.distributeEAU(alice, BigInteger.valueOf(10))
+        eauByAlice.distribute(BigInteger.valueOf(10)).send()
 
-        assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(alice).send())
-        assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(bob).send())
-        assertEquals(BigInteger.valueOf(5), helper.eauToken.dividensAccrued(alice).send())
-        assertEquals(BigInteger.valueOf(5), helper.eauToken.dividensAccrued(bob).send())
-        assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(cashStash).send())
+        assertEquals(BigInteger.TEN, eauToken.balanceOf(alice).send())
+        assertEquals(BigInteger.TEN, eauToken.balanceOf(bob).send())
+        assertEquals(BigInteger.valueOf(5), eauToken.dividensAccrued(alice).send())
+        assertEquals(BigInteger.valueOf(5), eauToken.dividensAccrued(bob).send())
+        assertEquals(BigInteger.TEN, eauToken.balanceOf(cashStash).send())
     }
 
     /**
@@ -64,16 +69,16 @@ class EAUTokenTest {
      */
     @Test
     fun testEAUWithdrawal() {
-        helper.addEAU(alice, BigInteger.valueOf(20))
-        helper.addEAU(bob, BigInteger.valueOf(10))
-        assertEquals(BigInteger.ZERO, helper.eauToken.balanceOf(cashStash).send())
-        helper.distributeEAU(alice, BigInteger.valueOf(10))
+        eauToken.mint(alice, BigInteger.valueOf(20)).send()
+        eauToken.mint(bob, BigInteger.valueOf(10)).send()
+        assertEquals(BigInteger.ZERO, eauToken.balanceOf(cashStash).send())
+        eauByAlice.distribute(BigInteger.valueOf(10)).send()
 
-        helper.eauToken.withdrawDividends(bob).send()
+        eauToken.withdrawDividends(bob).send()
 
-        assertEquals(BigInteger.valueOf(15), helper.eauToken.balanceOf(bob).send())
-        assertEquals(BigInteger.ZERO, helper.eauToken.dividensAccrued(bob).send())
-        assertEquals(BigInteger.valueOf(5), helper.eauToken.balanceOf(cashStash).send())
+        assertEquals(BigInteger.valueOf(15), eauToken.balanceOf(bob).send())
+        assertEquals(BigInteger.ZERO, eauToken.dividensAccrued(bob).send())
+        assertEquals(BigInteger.valueOf(5), eauToken.balanceOf(cashStash).send())
     }
 
     /**
@@ -84,14 +89,14 @@ class EAUTokenTest {
      */
     @Test
     fun distributionLeftover() {
-        helper.addEAU(alice, BigInteger.TWO)
-        helper.addEAU(bob, BigInteger.ONE)
-        assertEquals(BigInteger.ZERO, helper.eauToken.balanceOf(cashStash).send())
+        eauToken.mint(alice, BigInteger.TWO).send()
+        eauToken.mint(bob, BigInteger.ONE).send()
+        assertEquals(BigInteger.ZERO, eauToken.balanceOf(cashStash).send())
 
-        helper.distributeEAU(alice, BigInteger.ONE)
+        eauByAlice.distribute(BigInteger.ONE).send()
 
-        assertEquals(BigInteger.ZERO, helper.eauToken.dividensAccrued(alice).send())
-        assertEquals(BigInteger.ZERO, helper.eauToken.dividensAccrued(bob).send())
-        assertEquals(BigInteger.ONE, helper.eauToken.balanceOf(cashStash).send())
+        assertEquals(BigInteger.ZERO, eauToken.dividensAccrued(alice).send())
+        assertEquals(BigInteger.ZERO, eauToken.dividensAccrued(bob).send())
+        assertEquals(BigInteger.ONE, eauToken.balanceOf(cashStash).send())
     }
 }

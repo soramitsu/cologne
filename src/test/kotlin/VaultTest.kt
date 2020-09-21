@@ -109,7 +109,7 @@ class VaultTest {
     fun closeNoDebt() {
         ownerCreatesVault(initialAmount, tokenPrice)
         val eauBalance = BigInteger.valueOf(123)
-        eauToken.mint(vault.contractAddress, eauBalance).send()
+        helper.addEAU(vault.contractAddress, eauBalance)
         val clgnBalance = BigInteger.valueOf(234)
         helper.addCLGN(vault.contractAddress, clgnBalance)
 
@@ -215,7 +215,7 @@ class VaultTest {
     fun payOffNoDebt() {
         ownerCreatesVault(initialAmount, tokenPrice)
         val toPayOff = BigInteger.valueOf(50_000)
-        helper.eauToken.mint(owner, toPayOff).send()
+        helper.addEAU(owner, toPayOff)
 
         eauToken.approve(vault.contractAddress, toPayOff).send()
         vault.payOff(toPayOff).send()

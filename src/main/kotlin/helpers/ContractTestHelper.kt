@@ -41,19 +41,30 @@ class ContractTestHelper(host: String, port: Int) {
 
     init {
         // Deploy contracts
-        val seed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
-        clgnToken = CLGNToken.deploy(web3, seed, gasProvider).send()
-        eauToken = EAUToken.deploy(web3, seed, gasProvider).send()
-        userToken = UserToken.deploy(web3, seed, gasProvider).send()
+        clgnToken = CLGNToken.deploy(web3, credentialsSeed, gasProvider).send()
+        eauToken = EAUToken.deploy(web3, credentialsSeed, gasProvider).send()
+        userToken = UserToken.deploy(web3, credentialsSeed, gasProvider).send()
         priceOracle =
-            PriceOracleMock.deploy(web3, seed, gasProvider, clgnToken.contractAddress, eauToken.contractAddress).send()
+            PriceOracleMock.deploy(
+                web3,
+                credentialsSeed,
+                gasProvider,
+                clgnToken.contractAddress,
+                eauToken.contractAddress
+            ).send()
         marketAdaptor =
-            MarketAdaptorMock.deploy(web3, seed, gasProvider, clgnToken.contractAddress, eauToken.contractAddress)
+            MarketAdaptorMock.deploy(
+                web3,
+                credentialsSeed,
+                gasProvider,
+                clgnToken.contractAddress,
+                eauToken.contractAddress
+            )
                 .send()
-        timeProvider = TimeProviderMock.deploy(web3, seed, gasProvider).send()
+        timeProvider = TimeProviderMock.deploy(web3, credentialsSeed, gasProvider).send()
         medleyDAO = MedleyDAO.deploy(
             web3,
-            seed,
+            credentialsSeed,
             gasProvider,
             clgnToken.contractAddress,
             eauToken.contractAddress,
@@ -62,6 +73,9 @@ class ContractTestHelper(host: String, port: Int) {
             timeProvider.contractAddress
         ).send()
         clgnToken.transferOwnership(medleyDAO.contractAddress).send()
+        // some EAU for tests
+        eauToken.mint(credentialsSeed.address, BigInteger.valueOf(100000)).send()
+        eauToken.transferOwnership(medleyDAO.contractAddress).send()
     }
 
     fun addCLGN(address: String, amount: BigInteger) {
@@ -69,19 +83,7 @@ class ContractTestHelper(host: String, port: Int) {
     }
 
     fun addEAU(address: String, amount: BigInteger) {
-        eauToken.mint(address, amount).send()
-    }
-
-    fun distributeEAU(address: String, amount: BigInteger) {
-        if (address == credentialsAlice.address) {
-            val aliceEau = EAUToken.load(eauToken.contractAddress, web3, credentialsAlice, gasProvider)
-            aliceEau.distribute(amount).send()
-        } else if (address == credentialsBob.address) {
-            val bobEau = EAUToken.load(eauToken.contractAddress, web3, credentialsBob, gasProvider)
-            bobEau.distribute(amount).send()
-        } else {
-            throw IllegalAccessException("Wrong address - don't know credentials")
-        }
+        eauToken.transfer(address, amount).send()
     }
 
     /**

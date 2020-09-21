@@ -136,7 +136,7 @@ class ClgnStakeSlashingAcceptanceTest {
      */
     @Test
     fun slashBountyDistribution() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000))
         ownerCreatesVault(amount = BigInteger.valueOf(16000), stake = BigInteger.valueOf(1000))
         val initialClgnSupply = clgnToken.totalSupply().send()
         breachVault()
@@ -159,7 +159,7 @@ class ClgnStakeSlashingAcceptanceTest {
      */
     @Test
     fun slashPrincipalPartiallyCovered() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000))
         ownerCreatesVault(amount = BigInteger.valueOf(16000), price = BigInteger.ONE, stake = BigInteger.valueOf(1000))
         breachVault()
         // wait 5 days for fees and ensure fees accrued
@@ -186,7 +186,7 @@ class ClgnStakeSlashingAcceptanceTest {
      */
     @Test
     fun slashPrincipalsCoveredAndFeesPatiallyCovered() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000))
         ownerCreatesVault(amount = BigInteger.valueOf(40000), price = BigInteger.ONE, stake = BigInteger.valueOf(5550))
         breachVault()
         // ensure fees are not covered by stake
@@ -212,7 +212,7 @@ class ClgnStakeSlashingAcceptanceTest {
      */
     @Test
     fun slashCovered() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000))
         ownerCreatesVault(amount = BigInteger.valueOf(40000), price = BigInteger.ONE, stake = BigInteger.valueOf(10000))
         breachVault()
         // ensure fees are not covered by stake

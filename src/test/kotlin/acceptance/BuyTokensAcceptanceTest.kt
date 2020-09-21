@@ -69,7 +69,7 @@ class BuyTokensAcceptanceTest {
     fun buyTokens() {
         ownerCreatesVault()
         val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
@@ -91,7 +91,7 @@ class BuyTokensAcceptanceTest {
         val insufficientAmount = BigInteger.ONE
         ownerCreatesVault(amount = insufficientAmount)
         val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         assertThrows<TransactionException> {
@@ -114,7 +114,7 @@ class BuyTokensAcceptanceTest {
         ownerCreatesVault()
         val priceTooHigh = BigInteger.ONE
         val costInEau = toBuy.multiply(priceTooHigh)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         assertThrows<TransactionException> {

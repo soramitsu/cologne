@@ -164,7 +164,7 @@ class CloseOutAcceptanceTest {
         ownerCreatesVault()
         breachVault()
         val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
@@ -187,7 +187,7 @@ class CloseOutAcceptanceTest {
         ownerCreatesVault()
         breachVault()
         val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
         vault.startInitialLiquidityAuction().send()
         helper.passTime(BigInteger.valueOf(30 * 60 * 100))
 
@@ -213,7 +213,7 @@ class CloseOutAcceptanceTest {
         vault.startInitialLiquidityAuction().send()
         val toBuy = BigInteger.ONE
         val costInEau = toBuy.multiply(tokenPrice)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
         assertEquals(true, vault.isLimitBreached.send())
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
@@ -242,7 +242,7 @@ class CloseOutAcceptanceTest {
         val price = vault.price.send()
         assertEquals(BigInteger.ONE, price)
         val costInEau = toBuy.multiply(price)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
         assertEquals(true, vault.isLimitBreached.send())
         // add CLGN to swap for penalty
         val penaltyInClgn = toBuy.div(BigInteger.TEN).div(helper.clgnEauPrice)
@@ -272,7 +272,7 @@ class CloseOutAcceptanceTest {
         val toBuy = BigInteger.valueOf(2000)
         val price = BigInteger.ONE
         val costInEau = toBuy.multiply(price)
-        eauToken.mint(buyer.address, costInEau).send()
+        helper.addEAU(buyer.address, costInEau)
         ownerCreatesVault(amount = BigInteger.valueOf(8000), price = price)
         breachVault()
         intiatorVault.startInitialLiquidityAuction().send()

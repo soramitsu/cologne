@@ -156,7 +156,7 @@ class ClgnAuctionAcceptanceTest {
      */
     @Test
     fun coverShortfall() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1100)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1100))
         helper.addCLGN(coverInitiator.address, BigInteger.valueOf(25))
         ownerCreatesVault()
         breachVault()
