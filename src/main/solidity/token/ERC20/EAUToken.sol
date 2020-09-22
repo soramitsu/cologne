@@ -4,14 +4,15 @@ pragma solidity ^0.7.0;
 
 import "./DividendERC20.sol";
 import "./IMintableBurnableERC20.sol";
+import "./../../utils/Ownable.sol";
 
-contract EAUToken is DividendERC20, IMintableBurnableERC20 {
+contract EAUToken is DividendERC20, IMintableBurnableERC20, Ownable {
     using SafeMath for uint256;
 
-    constructor() DividendERC20("Test EAU liquidity token", "TEST_EAU") {
+    constructor() DividendERC20("Test EAU liquidity token", "TEST_EAU") Ownable(_msgSender()) {
     }
 
-    function mint(address account, uint256 value) external override {
+    function mint(address account, uint256 value) onlyOwner external override {
         _mint(account, value);
     }
 

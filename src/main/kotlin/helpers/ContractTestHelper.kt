@@ -9,6 +9,17 @@ import org.web3j.tx.gas.StaticGasProvider
 import java.math.BigInteger
 
 /**
+ * Vault states
+ */
+enum class VaultState {
+    Trading, Defaulted, InitialLiquidityAuctionInProcess, WaitingForSlashing, WaitingForClgnAuction, Slashed, Closed;
+
+    fun toBigInteger(): BigInteger {
+        return BigInteger.valueOf(this.ordinal.toLong())
+    }
+}
+
+/**
  * Creates credentials and deploy contracts
  */
 class ContractTestHelper(host: String, port: Int) {
@@ -27,7 +38,7 @@ class ContractTestHelper(host: String, port: Int) {
     val credentialsDave = Credentials.create("0x5555555555555555555555555555555555555555555555555555555555555555")
 
     // Contracts
-    val mdlyToken: MDLYToken
+    val clgnToken: CLGNToken
     val eauToken: EAUToken
     val userToken: UserToken
     val priceOracle: PriceOracleMock
@@ -36,64 +47,65 @@ class ContractTestHelper(host: String, port: Int) {
     lateinit var vaultByOwner: Vault
     val timeProvider: TimeProviderMock
 
-    // MDLY/EAU exchange rate
-    val mdlyEauPrice = BigInteger.TWO
+    // CLGN/EAU exchange rate
+    val clgnEauPrice = BigInteger.TWO
 
     init {
         // Deploy contracts
-        val seed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
-        mdlyToken = MDLYToken.deploy(web3, seed, gasProvider).send()
-        eauToken = EAUToken.deploy(web3, seed, gasProvider).send()
-        userToken = UserToken.deploy(web3, seed, gasProvider).send()
+        clgnToken = CLGNToken.deploy(web3, credentialsSeed, gasProvider).send()
+        eauToken = EAUToken.deploy(web3, credentialsSeed, gasProvider).send()
+        userToken = UserToken.deploy(web3, credentialsSeed, gasProvider).send()
         priceOracle =
-            PriceOracleMock.deploy(web3, seed, gasProvider, mdlyToken.contractAddress, eauToken.contractAddress).send()
+            PriceOracleMock.deploy(
+                web3,
+                credentialsSeed,
+                gasProvider,
+                clgnToken.contractAddress,
+                eauToken.contractAddress
+            ).send()
         marketAdaptor =
-            MarketAdaptorMock.deploy(web3, seed, gasProvider, mdlyToken.contractAddress, eauToken.contractAddress)
+            MarketAdaptorMock.deploy(
+                web3,
+                credentialsSeed,
+                gasProvider,
+                clgnToken.contractAddress,
+                eauToken.contractAddress
+            )
                 .send()
-        timeProvider = TimeProviderMock.deploy(web3, seed, gasProvider).send()
+        timeProvider = TimeProviderMock.deploy(web3, credentialsSeed, gasProvider).send()
         medleyDAO = MedleyDAO.deploy(
             web3,
-            seed,
+            credentialsSeed,
             gasProvider,
-            mdlyToken.contractAddress,
+            clgnToken.contractAddress,
             eauToken.contractAddress,
             priceOracle.contractAddress,
             marketAdaptor.contractAddress,
             timeProvider.contractAddress
         ).send()
+        clgnToken.transferOwnership(medleyDAO.contractAddress).send()
+        // some EAU for tests
+        eauToken.mint(credentialsSeed.address, BigInteger.valueOf(100000)).send()
+        eauToken.transferOwnership(medleyDAO.contractAddress).send()
     }
 
-    fun addMDLY(address: String, amount: BigInteger) {
-        mdlyToken.mint(address, amount).send()
+    fun addCLGN(address: String, amount: BigInteger) {
+        clgnToken.transfer(address, amount).send()
     }
 
     fun addEAU(address: String, amount: BigInteger) {
-        eauToken.mint(address, amount).send()
-    }
-
-    fun distributeEAU(address: String, amount: BigInteger) {
-        if (address == credentialsAlice.address) {
-            val aliceEau = EAUToken.load(eauToken.contractAddress, web3, credentialsAlice, gasProvider)
-            aliceEau.distribute(amount).send()
-        } else if (address == credentialsBob.address) {
-            val bobEau = EAUToken.load(eauToken.contractAddress, web3, credentialsBob, gasProvider)
-            bobEau.distribute(amount).send()
-        } else {
-            throw IllegalAccessException("Wrong address - don't know credentials")
-        }
+        eauToken.transfer(address, amount).send()
     }
 
     /**
      * Creates vault with owner provided by credentials
      * @param owner - the owner of vault
-     * @param stakeAmount - stake in MDLY
      * @param userTokenAmount - amount of user tokens
      * @param userTokenPrice - price of user tokens in EAU
      * @return vault address
      */
     fun createVault(
         owner: Credentials,
-        stakeAmount: BigInteger,
         userTokenAmount: BigInteger,
         userTokenPrice: BigInteger
     ): String {
@@ -102,18 +114,24 @@ class ContractTestHelper(host: String, port: Int) {
         val tokenByOwner = UserToken.load(userToken.contractAddress, web3, owner, gasProvider)
         tokenByOwner.approve(medleyDAO.contractAddress, userTokenAmount).send()
 
-        mdlyToken.mint(owner.address, stakeAmount).send()
-        val mdlyTokenByOwner = UserToken.load(mdlyToken.contractAddress, web3, owner, gasProvider)
-        mdlyTokenByOwner.approve(medleyDAO.contractAddress, stakeAmount).send()
+        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, web3, owner, gasProvider)
 
         val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
         val tx =
-            medleyDaoByOwner.createVault(userToken.contractAddress, stakeAmount, userTokenAmount, userTokenPrice).send()
+            medleyDaoByOwner.createVault(userToken.contractAddress, userTokenAmount, userTokenPrice).send()
         val vaultAddress = medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
 
         vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
 
         return vaultAddress
+    }
+
+    fun stake(vaultAddress: String, owner: Credentials, amount: BigInteger) {
+        clgnToken.transfer(owner.address, amount).send()
+        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, web3, owner, gasProvider)
+        clgnTokenByOwner.approve(medleyDAO.contractAddress, amount).send()
+        vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
+        vaultByOwner.stake(amount).send()
     }
 
     /**

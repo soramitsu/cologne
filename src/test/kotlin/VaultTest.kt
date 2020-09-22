@@ -1,5 +1,6 @@
 import contract.*
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -8,6 +9,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.images.builder.ImageFromDockerfile
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.web3j.crypto.Credentials
 import org.web3j.protocol.exceptions.TransactionException
 import java.math.BigInteger
 import java.nio.file.Path
@@ -26,8 +28,9 @@ class VaultTest {
     lateinit var helper: ContractTestHelper
     lateinit var medleyDAO: MedleyDAO
     lateinit var owner: String
+    lateinit var ownerCredentials: Credentials
     lateinit var userToken: UserToken
-    lateinit var mdlyToken: MDLYToken
+    lateinit var clgnToken: CLGNToken
     lateinit var eauToken: EAUToken
     val stake = BigInteger.valueOf(20)
     val initialAmount = BigInteger.valueOf(100)
@@ -38,26 +41,34 @@ class VaultTest {
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
         owner = helper.credentialsAlice.address
+        ownerCredentials = helper.credentialsAlice
         // load medley with Alice credentials
         medleyDAO =
-            MedleyDAO.load(helper.medleyDAO.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+            MedleyDAO.load(helper.medleyDAO.contractAddress, helper.web3, ownerCredentials, helper.gasProvider)
         // load UserToken with owner credentials
         userToken =
-            UserToken.load(helper.userToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
-        // load MDLY token with owner credentials
-        mdlyToken =
-            MDLYToken.load(helper.mdlyToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+            UserToken.load(helper.userToken.contractAddress, helper.web3, ownerCredentials, helper.gasProvider)
+        // load CLGN token with owner credentials
+        clgnToken =
+            CLGNToken.load(helper.clgnToken.contractAddress, helper.web3, ownerCredentials, helper.gasProvider)
         // load EAU token with owner credentials
         eauToken =
-            EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+            EAUToken.load(helper.eauToken.contractAddress, helper.web3, ownerCredentials, helper.gasProvider)
     }
 
     /**
      * Deploy vault with Owner credentials
      */
     fun ownerCreatesVault(amount: BigInteger = initialAmount, price: BigInteger = tokenPrice) {
-        val vaultAddress = helper.createVault(helper.credentialsAlice, stake, amount, price)
-        vault = Vault.load(vaultAddress, helper.web3, helper.credentialsAlice, helper.gasProvider)
+        val vaultAddress = helper.createVault(helper.credentialsAlice, amount, price)
+        vault = Vault.load(vaultAddress, helper.web3, ownerCredentials, helper.gasProvider)
+    }
+
+    fun ownerStake(amount: BigInteger) {
+        helper.addCLGN(owner, amount)
+        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, helper.web3, ownerCredentials, helper.gasProvider)
+        clgnTokenByOwner.approve(vault.contractAddress, amount).send()
+        vault.stake(amount).send()
     }
 
     /**
@@ -70,6 +81,7 @@ class VaultTest {
     fun createVault() {
         ownerCreatesVault(initialAmount, tokenPrice)
 
+        assertEquals(VaultState.Trading.toBigInteger(), vault.state.send())
         assertEquals(owner, vault.owner().send())
         assertEquals(initialAmount, userToken.balanceOf(vault.contractAddress).send())
         assertEquals(BigInteger.ZERO, userToken.balanceOf(owner).send())
@@ -100,24 +112,26 @@ class VaultTest {
     }
 
     /**
-     * @given Vault deployed and has user tokens, MDLY and EAU and has no debt
+     * @given Vault deployed and has user tokens, CLGN and EAU and has no debt
      * @when the owner closes vault
-     * @then all assets (user tokens left in vault, EAU and MDLY stake and MDLY assets transferred from the vault to the
+     * @then all assets (user tokens left in vault, EAU and CLGN stake and CLGN assets transferred from the vault to the
      * owner, vault is closed
      */
     @Test
     fun closeNoDebt() {
         ownerCreatesVault(initialAmount, tokenPrice)
         val eauBalance = BigInteger.valueOf(123)
-        eauToken.mint(vault.contractAddress, eauBalance).send()
-        val mdlyBalance = BigInteger.valueOf(234)
-        mdlyToken.mint(vault.contractAddress, mdlyBalance).send()
+        helper.addEAU(vault.contractAddress, eauBalance)
+        val clgnBalance = BigInteger.valueOf(234)
+        helper.addCLGN(vault.contractAddress, clgnBalance)
+        ownerStake(stake)
 
         vault.close().send()
 
+        assertEquals(VaultState.Closed.toBigInteger(), vault.state.send())
         assertEquals(initialAmount, userToken.balanceOf(owner).send())
         assertEquals(eauBalance, eauToken.balanceOf(owner).send())
-        assertEquals(mdlyBalance.add(stake), mdlyToken.balanceOf(owner).send())
+        assertEquals(clgnBalance.add(stake), clgnToken.balanceOf(owner).send())
     }
 
     /**
@@ -131,6 +145,7 @@ class VaultTest {
         val toBorrow = BigInteger.TEN
         vault.borrow(toBorrow).send()
 
+        assertEquals(VaultState.Trading.toBigInteger(), vault.state.send())
         assertThrows<TransactionException> {
             vault.close().send()
         }
@@ -215,7 +230,7 @@ class VaultTest {
     fun payOffNoDebt() {
         ownerCreatesVault(initialAmount, tokenPrice)
         val toPayOff = BigInteger.valueOf(50_000)
-        helper.eauToken.mint(owner, toPayOff).send()
+        helper.addEAU(owner, toPayOff)
 
         eauToken.approve(vault.contractAddress, toPayOff).send()
         vault.payOff(toPayOff).send()

@@ -7,18 +7,18 @@ import "../math/SafeMath.sol";
 import "../token/ERC20/ERC20.sol";
 
 /**
- * MDLY/EAU market
+ * CLGN/EAU market
  */
 contract MarketAdaptorMock is IMarketAdaptor {
     using SafeMath for uint256;
 
-    ERC20 _mdly;
+    ERC20 _clgn;
     ERC20 _eau;
-    // fixed rate MDLY/EAU
+    // fixed rate CLGN/EAU
     uint256 _rate = 2;
 
-    constructor(address mdly, address eau) {
-        _mdly = ERC20(mdly);
+    constructor(address clgn, address eau) {
+        _clgn = ERC20(clgn);
         _eau = ERC20(eau);
     }
 
@@ -32,17 +32,17 @@ contract MarketAdaptorMock is IMarketAdaptor {
         address to,
         uint //deadline
     ) external override returns (uint[] memory amounts) {
-        require(path.length == 2 && (path[0] == address(_mdly) && path[1] == address(_eau))
-        || (path[0] == address(_eau) && path[1] == address(_mdly)), "Token not supported");
+        require(path.length == 2 && (path[0] == address(_clgn) && path[1] == address(_eau))
+        || (path[0] == address(_eau) && path[1] == address(_clgn)), "Token not supported");
 
         uint[] memory ret = getAmountsOut(amountIn, path);
         require(ret[1] >= amountOutMin, "amountOutMin too large");
-        if (path[0] == address(_mdly)) {
-            require(_mdly.transferFrom(to, address(this), ret[0]), "MDLY transfer error");
+        if (path[0] == address(_clgn)) {
+            require(_clgn.transferFrom(to, address(this), ret[0]), "CLGN transfer error");
             require(_eau.transfer(to, ret[1]), "EAU transfer error");
         } else if (path[0] == address(_eau)) {
             require(_eau.transferFrom(to, address(this), ret[0]), "EAU transfer error");
-            require(_mdly.transfer(to, ret[1]), "MDLY transfer error");
+            require(_clgn.transfer(to, ret[1]), "CLGN transfer error");
         }
         return ret;
     }
@@ -57,17 +57,17 @@ contract MarketAdaptorMock is IMarketAdaptor {
         address to,
         uint //deadline
     ) external override returns (uint[] memory amounts) {
-        require(path.length == 2 && (path[0] == address(_mdly) && path[1] == address(_eau))
-        || (path[0] == address(_eau) && path[1] == address(_mdly)), "Token not supported");
+        require(path.length == 2 && (path[0] == address(_clgn) && path[1] == address(_eau))
+        || (path[0] == address(_eau) && path[1] == address(_clgn)), "Token not supported");
 
         uint[] memory ret = getAmountsIn(amountOut, path);
         require(ret[0] <= amountInMax, "amountInMax too small");
-        if (path[0] == address(_mdly)) {
-            require(_mdly.transferFrom(to, address(this), ret[0]), "MDLY transfer error");
+        if (path[0] == address(_clgn)) {
+            require(_clgn.transferFrom(to, address(this), ret[0]), "CLGN transfer error");
             require(_eau.transfer(to, ret[1]), "EAU transfer error");
         } else if (path[0] == address(_eau)) {
             require(_eau.transferFrom(to, address(this), ret[0]), "EAU transfer error");
-            require(_mdly.transfer(to, ret[1]), "MDLY transfer error");
+            require(_clgn.transfer(to, ret[1]), "CLGN transfer error");
         }
         return ret;
     }
@@ -77,12 +77,12 @@ contract MarketAdaptorMock is IMarketAdaptor {
      * amounts
      */
     function getAmountsOut(uint amountIn, address[] memory path) public view override returns (uint[] memory amounts) {
-        require(path.length == 2 && (path[0] == address(_mdly) && path[1] == address(_eau))
-        || (path[0] == address(_eau) && path[1] == address(_mdly)), "Token not supported");
+        require(path.length == 2 && (path[0] == address(_clgn) && path[1] == address(_eau))
+        || (path[0] == address(_eau) && path[1] == address(_clgn)), "Token not supported");
 
         uint[] memory ret = new uint[](2);
         ret[0] = amountIn;
-        if (path[0] == address(_mdly)) {
+        if (path[0] == address(_clgn)) {
             ret[1] = ret[0].mul(_rate);
         } else if (path[0] == address(_eau)) {
             ret[1] = ret[0].div(_rate);
@@ -95,12 +95,12 @@ contract MarketAdaptorMock is IMarketAdaptor {
      * amounts
      */
     function getAmountsIn(uint amountOut, address[] memory path) public view override returns (uint[] memory amounts) {
-        require(path.length == 2 && (path[0] == address(_mdly) && path[1] == address(_eau))
-        || (path[0] == address(_eau) && path[1] == address(_mdly)), "Token not supported");
+        require(path.length == 2 && (path[0] == address(_clgn) && path[1] == address(_eau))
+        || (path[0] == address(_eau) && path[1] == address(_clgn)), "Token not supported");
 
         uint[] memory ret = new uint[](2);
         ret[1] = amountOut;
-        if (path[0] == address(_mdly)) {
+        if (path[0] == address(_clgn)) {
             ret[0] = ret[1].div(_rate);
         } else if (path[0] == address(_eau)) {
             ret[0] = ret[1].mul(_rate);

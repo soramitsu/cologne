@@ -1,9 +1,11 @@
 package acceptance
 
 import contract.EAUToken
-import contract.MDLYToken
+import contract.CLGNToken
+import contract.UserToken
 import contract.Vault
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -18,7 +20,7 @@ import java.math.BigInteger
 import java.nio.file.Path
 
 @Testcontainers
-class MdlyStakeSlashingAcceptanceTest {
+class ClgnStakeSlashingAcceptanceTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
@@ -36,7 +38,7 @@ class MdlyStakeSlashingAcceptanceTest {
     lateinit var auctionInitiator: Credentials
     lateinit var slashingIntiator: Credentials
     lateinit var eauToken: EAUToken
-    lateinit var mdlyToken: MDLYToken
+    lateinit var clgnToken: CLGNToken
     lateinit var ownerVault: Vault
     lateinit var auctionIntiatorVault: Vault
     lateinit var slashingInitiatorVault: Vault
@@ -48,7 +50,7 @@ class MdlyStakeSlashingAcceptanceTest {
         auctionInitiator = helper.credentialsBob
         slashingIntiator = helper.credentialsCharlie
         eauToken = helper.eauToken
-        mdlyToken = helper.mdlyToken
+        clgnToken = helper.clgnToken
     }
 
     /**
@@ -59,11 +61,17 @@ class MdlyStakeSlashingAcceptanceTest {
         price: BigInteger = tokenPrice,
         stake: BigInteger = initialStake
     ) {
-        val vaultAddress = helper.createVault(owner, stake, amount, price)
+        val vaultAddress = helper.createVault(owner, amount, price)
         ownerVault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
         auctionIntiatorVault = Vault.load(ownerVault.contractAddress, helper.web3, auctionInitiator, helper.gasProvider)
         slashingInitiatorVault =
             Vault.load(ownerVault.contractAddress, helper.web3, slashingIntiator, helper.gasProvider)
+
+        // Stake
+        helper.addCLGN(owner.address, stake)
+        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, helper.web3, owner, helper.gasProvider)
+        clgnTokenByOwner.approve(ownerVault.contractAddress, stake).send()
+        ownerVault.stake(stake).send()
     }
 
     /**
@@ -127,31 +135,32 @@ class MdlyStakeSlashingAcceptanceTest {
     }
 
     /**
-     * @given the vault is breached and initial liquidity auction is over and stake is 1000 MDLY
+     * @given the vault is breached and initial liquidity auction is over and stake is 1000 CLGN
      * @when stake is slashed
      * @then penalty is distributed:
-     *  2,5% of stake (25 MDLY) goes to Initial Liquidity Auction initiator
-     *  2,5% of stake (25 MDLY) goes to slashing initiator
-     *  5% of stake (50 MDLY) is burned
+     *  2,5% of stake (25 CLGN) goes to Initial Liquidity Auction initiator
+     *  2,5% of stake (25 CLGN) goes to slashing initiator
+     *  5% of stake (50 CLGN) is burned
      */
     @Test
     fun slashBountyDistribution() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000))
         ownerCreatesVault(amount = BigInteger.valueOf(16000), stake = BigInteger.valueOf(1000))
-        val initialMdlySupply = mdlyToken.totalSupply().send()
+        val initialClgnSupply = clgnToken.totalSupply().send()
         breachVault()
         auctionIntiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), ownerVault.state.send())
 
         slashingInitiatorVault.slash().send()
 
-        assertEquals(BigInteger.valueOf(25), mdlyToken.balanceOf(auctionInitiator.address).send())
-        assertEquals(BigInteger.valueOf(25), mdlyToken.balanceOf(slashingIntiator.address).send())
-        assertEquals(initialMdlySupply.subtract(BigInteger.valueOf(50)), mdlyToken.totalSupply().send())
+        assertEquals(BigInteger.valueOf(25), clgnToken.balanceOf(auctionInitiator.address).send())
+        assertEquals(BigInteger.valueOf(25), clgnToken.balanceOf(slashingIntiator.address).send())
+        assertEquals(initialClgnSupply.subtract(BigInteger.valueOf(50)), clgnToken.totalSupply().send())
     }
 
     /**
-     * @given the vault has principal debt of 4000 EAU and some fee accrued and stake of 1000 MDLY (assessed as 2000
+     * @given the vault has principal debt of 4000 EAU and some fee accrued and stake of 1000 CLGN (assessed as 2000
      * EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off partially (1800 EAU paid off and 2200 is current debt) and fees are forgiven and
@@ -159,7 +168,7 @@ class MdlyStakeSlashingAcceptanceTest {
      */
     @Test
     fun slashPrincipalPartiallyCovered() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(2000))
         ownerCreatesVault(amount = BigInteger.valueOf(16000), price = BigInteger.ONE, stake = BigInteger.valueOf(1000))
         breachVault()
         // wait 5 days for fees and ensure fees accrued
@@ -178,7 +187,7 @@ class MdlyStakeSlashingAcceptanceTest {
     }
 
     /**
-     * @given the vault has principal debt of 10000 EAU and fees accrued more then 2 EAU and stake of 5600 MDLY
+     * @given the vault has principal debt of 10000 EAU and fees accrued more then 2 EAU and stake of 5600 CLGN
      * (assessed as 11200 EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off (10000 EAU) and penalty paid off (10000 EAU) and fees paid off partially (100 EAU) and
@@ -186,7 +195,7 @@ class MdlyStakeSlashingAcceptanceTest {
      */
     @Test
     fun slashPrincipalsCoveredAndFeesPatiallyCovered() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000))
         ownerCreatesVault(amount = BigInteger.valueOf(40000), price = BigInteger.ONE, stake = BigInteger.valueOf(5550))
         breachVault()
         // ensure fees are not covered by stake
@@ -204,15 +213,15 @@ class MdlyStakeSlashingAcceptanceTest {
     }
 
     /**
-     * @given the vault has principal debt of 10000 EAU and fees accrued are 1000 EAU and stake of 10000 MDLY
+     * @given the vault has principal debt of 10000 EAU and fees accrued are 1000 EAU and stake of 10000 CLGN
      * (assessed as 20000 EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off (10000 EAU) and penalty paid off (1010 EAU) and fees paid off (100 EAU) and stake
-     * leftover in EAU is 4445 MDLY (8890 EAU
+     * leftover in EAU is 4445 CLGN (8890 EAU
      */
     @Test
     fun slashCovered() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(20000))
         ownerCreatesVault(amount = BigInteger.valueOf(40000), price = BigInteger.ONE, stake = BigInteger.valueOf(10000))
         breachVault()
         // ensure fees are not covered by stake

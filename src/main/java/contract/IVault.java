@@ -13,6 +13,7 @@ import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Event;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
@@ -66,6 +67,8 @@ public class IVault extends Contract {
     public static final String FUNC_PAYOFF = "payOff";
 
     public static final String FUNC_SLASH = "slash";
+
+    public static final String FUNC_STAKE = "stake";
 
     public static final String FUNC_STARTINITIALLIQUIDITYAUCTION = "startInitialLiquidityAuction";
 
@@ -202,6 +205,13 @@ public class IVault extends Contract {
         return executeRemoteCallSingleValueReturn(function, BigInteger.class);
     }
 
+    public RemoteFunctionCall<BigInteger> getState() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETSTATE, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
+        return executeRemoteCallSingleValueReturn(function, BigInteger.class);
+    }
+
     public RemoteFunctionCall<BigInteger> getTokenAmount() {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETTOKENAMOUNT, 
                 Arrays.<Type>asList(), 
@@ -235,6 +245,14 @@ public class IVault extends Contract {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_SLASH, 
                 Arrays.<Type>asList(), 
+                Collections.<TypeReference<?>>emptyList());
+        return executeRemoteCallTransaction(function);
+    }
+
+    public RemoteFunctionCall<TransactionReceipt> stake(BigInteger amount) {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
+                FUNC_STAKE, 
+                Arrays.<Type>asList(new org.web3j.abi.datatypes.generated.Uint256(amount)), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);
     }

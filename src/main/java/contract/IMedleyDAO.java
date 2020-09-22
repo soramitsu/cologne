@@ -42,19 +42,19 @@ public class IMedleyDAO extends Contract {
 
     public static final String FUNC_CREATEVAULT = "createVault";
 
+    public static final String FUNC_GETCLGNMARKET = "getClgnMarket";
+
+    public static final String FUNC_GETCLGNPRICEORACLE = "getClgnPriceOracle";
+
+    public static final String FUNC_GETCLGNTOKENADDRESS = "getClgnTokenAddress";
+
     public static final String FUNC_GETEAUTOKENADDRESS = "getEauTokenAddress";
-
-    public static final String FUNC_GETMDLYMARKET = "getMdlyMarket";
-
-    public static final String FUNC_GETMDLYPRICEORACLE = "getMdlyPriceOracle";
-
-    public static final String FUNC_GETMDLYTOKENADDRESS = "getMdlyTokenAddress";
 
     public static final String FUNC_LISTVAULTS = "listVaults";
 
-    public static final String FUNC_MINTEAU = "mintEAU";
+    public static final String FUNC_MINTCLGN = "mintCLGN";
 
-    public static final String FUNC_MINTMDLY = "mintMDLY";
+    public static final String FUNC_MINTEAU = "mintEAU";
 
     public static final Event VAULTCREATION_EVENT = new Event("VaultCreation", 
             Arrays.<TypeReference<?>>asList(new TypeReference<Address>(true) {}, new TypeReference<Address>(true) {}));
@@ -111,40 +111,39 @@ public class IMedleyDAO extends Contract {
         return vaultCreationEventFlowable(filter);
     }
 
-    public RemoteFunctionCall<TransactionReceipt> createVault(String token, BigInteger stake, BigInteger initialAmount, BigInteger tokenPrice) {
+    public RemoteFunctionCall<TransactionReceipt> createVault(String token, BigInteger initialAmount, BigInteger tokenPrice) {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
                 FUNC_CREATEVAULT, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, token), 
-                new org.web3j.abi.datatypes.generated.Uint256(stake), 
                 new org.web3j.abi.datatypes.generated.Uint256(initialAmount), 
                 new org.web3j.abi.datatypes.generated.Uint256(tokenPrice)), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);
     }
 
+    public RemoteFunctionCall<String> getClgnMarket() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETCLGNMARKET, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
+        return executeRemoteCallSingleValueReturn(function, String.class);
+    }
+
+    public RemoteFunctionCall<String> getClgnPriceOracle() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETCLGNPRICEORACLE, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
+        return executeRemoteCallSingleValueReturn(function, String.class);
+    }
+
+    public RemoteFunctionCall<String> getClgnTokenAddress() {
+        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETCLGNTOKENADDRESS, 
+                Arrays.<Type>asList(), 
+                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
+        return executeRemoteCallSingleValueReturn(function, String.class);
+    }
+
     public RemoteFunctionCall<String> getEauTokenAddress() {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETEAUTOKENADDRESS, 
-                Arrays.<Type>asList(), 
-                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
-        return executeRemoteCallSingleValueReturn(function, String.class);
-    }
-
-    public RemoteFunctionCall<String> getMdlyMarket() {
-        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETMDLYMARKET, 
-                Arrays.<Type>asList(), 
-                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
-        return executeRemoteCallSingleValueReturn(function, String.class);
-    }
-
-    public RemoteFunctionCall<String> getMdlyPriceOracle() {
-        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETMDLYPRICEORACLE, 
-                Arrays.<Type>asList(), 
-                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
-        return executeRemoteCallSingleValueReturn(function, String.class);
-    }
-
-    public RemoteFunctionCall<String> getMdlyTokenAddress() {
-        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETMDLYTOKENADDRESS, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);
@@ -165,18 +164,18 @@ public class IMedleyDAO extends Contract {
                 });
     }
 
-    public RemoteFunctionCall<TransactionReceipt> mintEAU(String beneficiary, BigInteger amount) {
+    public RemoteFunctionCall<TransactionReceipt> mintCLGN(String beneficiary, BigInteger amount) {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
-                FUNC_MINTEAU, 
+                FUNC_MINTCLGN, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, beneficiary), 
                 new org.web3j.abi.datatypes.generated.Uint256(amount)), 
                 Collections.<TypeReference<?>>emptyList());
         return executeRemoteCallTransaction(function);
     }
 
-    public RemoteFunctionCall<TransactionReceipt> mintMDLY(String beneficiary, BigInteger amount) {
+    public RemoteFunctionCall<TransactionReceipt> mintEAU(String beneficiary, BigInteger amount) {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(
-                FUNC_MINTMDLY, 
+                FUNC_MINTEAU, 
                 Arrays.<Type>asList(new org.web3j.abi.datatypes.Address(160, beneficiary), 
                 new org.web3j.abi.datatypes.generated.Uint256(amount)), 
                 Collections.<TypeReference<?>>emptyList());

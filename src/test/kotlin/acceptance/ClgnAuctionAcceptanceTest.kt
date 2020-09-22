@@ -1,9 +1,10 @@
 package acceptance
 
 import contract.EAUToken
-import contract.MDLYToken
+import contract.CLGNToken
 import contract.Vault
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -18,7 +19,7 @@ import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
 
 @Testcontainers
-class MdlyAuctionAcceptanceTest {
+class ClgnAuctionAcceptanceTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
@@ -37,7 +38,7 @@ class MdlyAuctionAcceptanceTest {
     lateinit var slashingInitiator: Credentials
     lateinit var coverInitiator: Credentials
     lateinit var eauToken: EAUToken
-    lateinit var mdlyToken: MDLYToken
+    lateinit var clgnToken: CLGNToken
     lateinit var ownerVault: Vault
     lateinit var auctionIntiatorVault: Vault
     lateinit var slashingInitiatorVault: Vault
@@ -51,7 +52,7 @@ class MdlyAuctionAcceptanceTest {
         slashingInitiator = helper.credentialsCharlie
         coverInitiator = helper.credentialsDave
         eauToken = helper.eauToken
-        mdlyToken = helper.mdlyToken
+        clgnToken = helper.clgnToken
     }
 
     /**
@@ -62,7 +63,7 @@ class MdlyAuctionAcceptanceTest {
         price: BigInteger = tokenPrice,
         stake: BigInteger = initialStake
     ) {
-        val vaultAddress = helper.createVault(owner, stake, amount, price)
+        val vaultAddress = helper.createVault(owner, amount, price)
         ownerVault = helper.vaultByOwner
         auctionIntiatorVault = Vault.load(vaultAddress, helper.web3, auctionInitiator, helper.gasProvider)
         slashingInitiatorVault = Vault.load(vaultAddress, helper.web3, slashingInitiator, helper.gasProvider)
@@ -132,10 +133,10 @@ class MdlyAuctionAcceptanceTest {
     }
 
     /**
-     * @given the vault is breached and the initial liquidity auction is over and caller doesn't have MDLY
+     * @given the vault is breached and the initial liquidity auction is over and caller doesn't have CLGN
      * @when cover shortfall called
-     * @then error returned - MDLY holder with at least 5% of total remaining outstanding EAU notional in the defaulted
-     * Vault can initiate a MDLY mint
+     * @then error returned - CLGN holder with at least 5% of total remaining outstanding EAU notional in the defaulted
+     * Vault can initiate a CLGN mint
      */
     @Test
     fun coverShortfallWrongInitiator() {
@@ -149,26 +150,31 @@ class MdlyAuctionAcceptanceTest {
     }
 
     /**
-     * @given the vault is slashed and has debt of 1000 EAU and cover initiator has 25 MDLY (assessed as 50 EAU) which
+     * @given the vault is slashed and has debt of 1000 EAU and cover initiator has 25 CLGN (assessed as 50 EAU) which
      * is 5% of outstanding debt
      * @when cover shortfall called
-     * @then 550 MDLY minted and sold for 1100 EAU, 1000 EAU are paid off and 100 EAU paid to initiator as bounty
+     * @then 550 CLGN minted and sold for 1100 EAU, 1000 EAU are paid off and 100 EAU paid to initiator as bounty
      */
     @Test
     fun coverShortfall() {
-        eauToken.mint(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1100)).send()
-        mdlyToken.mint(coverInitiator.address, BigInteger.valueOf(25)).send()
+        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1100))
+        helper.addCLGN(coverInitiator.address, BigInteger.valueOf(25))
         ownerCreatesVault()
         breachVault()
         failInitialAuction()
         assertEquals(BigInteger.ZERO, ownerVault.fees.send())
         assertEquals(BigInteger.valueOf(1000), ownerVault.principal.send())
-        val initialMdlySupply = mdlyToken.totalSupply().send()
+        val initialClgnSupply = clgnToken.totalSupply().send()
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), ownerVault.state.send())
+        slashingInitiatorVault.slash().send()
+        assertEquals(VaultState.WaitingForClgnAuction.toBigInteger(), ownerVault.state.send())
 
         coverInitiatorVault.coverShortfall().send()
 
-        assertEquals(BigInteger.valueOf(550), mdlyToken.totalSupply().send().subtract(initialMdlySupply))
+        assertEquals(VaultState.Slashed.toBigInteger(), ownerVault.state.send())
+        assertEquals(BigInteger.valueOf(550), clgnToken.totalSupply().send().subtract(initialClgnSupply))
         assertEquals(BigInteger.ZERO, ownerVault.getTotalDebt().send())
         assertEquals(BigInteger.valueOf(100), eauToken.balanceOf(coverInitiator.address).send())
+        assertEquals(VaultState.Slashed.toBigInteger(), ownerVault.state.send())
     }
 }
