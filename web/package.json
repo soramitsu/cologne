@@ -50,7 +50,7 @@
     "style-loader": "^1.2.1",
     "uglifyjs-webpack-plugin": "^2.2.0",
     "uuid": "^8.3.0",
-    "web3": "^1.2.11",
+    "ethers": "^5.0.14",
     "webpack": "^4.44.1",
     "webpack-cli": "^3.3.12",
     "webpack-merge": "^5.1.4",

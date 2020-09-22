@@ -3,7 +3,7 @@ import {Container, Menu} from "semantic-ui-react";
 
 import {connect} from "react-redux";
 
-import {Link, NavLink} from "react-router-dom";
+import {NavLink} from "react-router-dom";
 import {changeLang, LANG_ENG, LANG_RUS} from "../redux/actions/Lang";
 
 class Header extends React.Component {
@@ -18,10 +18,10 @@ class Header extends React.Component {
           <Menu.Item as="h3" header>
             Cologne
           </Menu.Item>
-          <Menu.Item header as={Link} to="/main" activeclassname="active">
+          <Menu.Item header as={NavLink} to="/main" activeclassname="active">
             Dashboard
           </Menu.Item>
-          <Menu.Item header as={Link} to="/login" activeclassname="active">
+          <Menu.Item header as={NavLink} to="/login" activeclassname="active">
             Login
           </Menu.Item>
           <Menu.Menu position="right">
