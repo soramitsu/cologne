@@ -69,6 +69,7 @@ class BuyTokensAcceptanceTest {
         ownerCreatesVault()
         val costInEau = toBuy.multiply(tokenPrice)
         helper.addEAU(buyer.address, costInEau)
+        assertEquals(initialAmount, buyerVault.tokenAmount.send())
 
         buyerEAUToken.approve(vault.contractAddress, costInEau).send()
         buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
@@ -78,6 +79,7 @@ class BuyTokensAcceptanceTest {
         assertEquals(BigInteger.ZERO, eauToken.balanceOf(buyer.address).send())
         assertEquals(initialAmount.minus(toBuy), userToken.balanceOf(vault.contractAddress).send())
         assertEquals(toBuy, userToken.balanceOf(buyer.address).send())
+        assertEquals(initialAmount - toBuy, buyerVault.tokenAmount.send())
     }
 
     /**

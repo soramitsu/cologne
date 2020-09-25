@@ -26,7 +26,8 @@ interface IVault {
         WaitingForSlashing,
         WaitingForClgnAuction,
         Slashed,
-        Closed
+        Closed,
+        SoldOut
     }
 
     /**
@@ -57,20 +58,17 @@ interface IVault {
      */
     function coverShortfall() external;
 
-    // Get amount of EAU the owner can borrow now
+    /** Maximum amount the owner can borrow (depends on TKN price and amount) */
     function getCreditLimit() external view returns (uint);
 
-    function getTotalDebt() external view returns (uint);
+    // Get amount of EAU the owner can borrow now before credit limit is exhausted
+    function canBorrow() external view returns (uint);
 
-    // Get total debt as principal and accrued interest charge
-    function getTotalDebt(uint time) external view returns (uint);
+    function getTotalDebt() external view returns (uint);
 
     function getPrincipal() external view returns (uint);
 
     function getFees() external view returns (uint);
-
-    // calculate fees over time
-    function getFees(uint time) external view returns (uint);
 
     // Returns User Token price in EAU
     function getPrice() external view returns (uint);
@@ -81,6 +79,40 @@ interface IVault {
     function getCollateralInEau() external view returns (uint);
 
     function getState() external view returns (VaultState);
+
+    /**
+     * Challenge
+     * Lock EAU enough to buy out all User Tokens in case of default at specified price
+     * @param price - price to buy out User Tokens
+     * @param eauToLock - EAU to lock for purchase (must be >= value of Tokens in EAU at specified price)
+     */
+    function challenge(uint price, uint eauToLock) external;
+
+    /**
+     * Redeem unlocked EAU and User Tokens bought
+     * If User Tokens were bought during challenging or EAU tokens were unlocked, this function transfer them to
+     * the challenger account.
+     * Can be called only by challenger.
+     * Returns EAU and User Tokens transferred to challenger
+     */
+    function redeemChallenge() external returns (uint eauAmount, uint userTokenAmount);
+
+    /**
+     * Returns EAU amount locked in challenge
+     * @param challenger address
+     */
+    function getChallengeLocked(address challenger) external view returns (uint eauLocked);
+
+    /**
+     * Returns EAU and User Token amount can be redeemed
+     * @param challenger address
+     */
+    function getRedeemableChallenge(address challenger) external view returns (uint eauAmount, uint userTokenAmount);
+
+    /**
+     * Get current challenge winner (challenger with highest price) address and price
+     */
+    function getChallengeWinner() external view returns (address, uint);
 
     event Purchase(uint amount, uint indexed price, address indexed to);
 }

@@ -57,6 +57,23 @@ contract Vault is IVault, Ownable {
     bool _slashed = false;
     bool _closed = false;
 
+    /**
+     * Challenge info - price and EAU amount locked
+     */
+    struct Challenge {
+        uint price;
+        uint eauAmountToLock;
+    }
+
+    // All challenges (challenger => challenge info)
+    mapping(address => Challenge) _challengers;
+
+    // Challenger address with highest price
+    address _challengeWinnerAddress = address(0);
+
+    // EAU reserved for challengers
+    uint eauForChallengers = 0;
+
     modifier notSlashed() {
         require(!_slashed, "Vault is slashed");
         _;
@@ -68,8 +85,12 @@ contract Vault is IVault, Ownable {
     }
 
     modifier initialAuctionIsOver {
-        // 180000 is a length of Initial Liquidity Auction in seconds
-        require(_closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000), "Vault::slash(): initial auction is not finished yet");
+        require(_initialAuctionIsOver(), "Vault: initial auction is not finished yet");
+        _;
+    }
+
+    modifier initialAuctionIsNotOver {
+        require(!_slashed && !_closed && !_initialAuctionIsOver(), "Vault: initial auction is over");
         _;
     }
 
@@ -94,16 +115,23 @@ contract Vault is IVault, Ownable {
     }
 
     function buy(uint amount, uint maxPrice, address to) notClosed notSlashed public override {
+        _buy(msg.sender, amount, maxPrice, to);
+    }
+
+    function _buy(address spender, uint amount, uint maxPrice, address to) private {
         require(amount <= _token.balanceOf(address(this)), "Vault::buy(): Not enough tokens to sell");
         uint price = getPrice();
         require(price > 0, "Vault::buy(): Initial Liquidity Auction is over");
+        require(msg.sender == _challengeWinnerAddress || price > _challengers[_challengeWinnerAddress].price, "Vault::buy(): Initial Liquidity Auction is over. Only challenger can buy out.");
         require(price <= maxPrice, "Vault::buy(): Price too low");
         uint costInEau = amount.mul(price);
 
         // distribute penalty if Initial Liquidity Auction is active
         if (_closeOutTime != 0) {
             uint penalty = costInEau.div(10);
-            require(_eauToken.transferFrom(msg.sender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
+            if (spender != address(this))
+                require(_eauToken.transferFrom(msg.sender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
+            require(_eauToken.balanceOf(address(this)) >= penalty, "Vault:buy: Not enough EAU for penalty");
 
             _eauToken.approve(address(_medleyDao.getClgnMarket()), penalty);
             uint clgnBought = _buyClgnForEau(penalty);
@@ -112,15 +140,16 @@ contract Vault is IVault, Ownable {
             require(_clgnToken.transfer(_closeOutInitiator, initiatorBounty), "Vault::buy: transfer CLGN bounty to initiator");
 
             uint bidderBounty = clgnBought.mul(33).div(100);
-            require(_clgnToken.transfer(msg.sender, bidderBounty), "Vault::buy: transfer CLGN bounty to bidder");
+            require(_clgnToken.transfer(to, bidderBounty), "Vault::buy: transfer CLGN bounty to bidder");
 
             _clgnToken.burn(clgnBought.sub(initiatorBounty).sub(bidderBounty));
 
             costInEau = costInEau.sub(penalty);
         }
 
-        payOff(costInEau);
-        require(_token.transfer(to, amount), "Vault::buy: cannot transfer EAU.");
+        _payOff(spender, costInEau);
+        require(_token.transfer(to, amount), "Vault::buy: cannot transfer User Token.");
+        _tokenAmount -= amount;
 
         if (_price != price)
             _price = price;
@@ -129,7 +158,7 @@ contract Vault is IVault, Ownable {
     }
 
     function borrow(uint amount) notClosed notSlashed onlyOwner public override {
-        require(amount <= getCreditLimit(), "Credit limit is exhausted ");
+        require(amount <= canBorrow(), "Credit limit is exhausted ");
 
         _medleyDao.mintEAU(owner(), amount);
         _principal += amount;
@@ -138,7 +167,13 @@ contract Vault is IVault, Ownable {
     }
 
     function payOff(uint amount) notClosed notSlashed public override {
-        require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
+        _payOff(msg.sender, amount);
+    }
+
+    function _payOff(address spender, uint amount) private {
+        if (spender != address(this))
+            require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
+        require(_eauToken.balanceOf(address(this)) >= amount, "Vault:payOff: Not enough EAU to pay off");
 
         _recordAccounting(AccountingRecordType.Deposit, amount, _timeProvider.getTime());
         _debtUpdateTime = _timeProvider.getTime();
@@ -167,10 +202,11 @@ contract Vault is IVault, Ownable {
     }
 
     function close() onlyOwner public override {
-        require(getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
+        require(_getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
         _token.transfer(owner(), _token.balanceOf(address(this)));
+        _tokenAmount = 0;
         _clgnToken.transfer(owner(), _clgnToken.balanceOf(address(this)));
-        _eauToken.transfer(owner(), _eauToken.balanceOf(address(this)));
+        _eauToken.transfer(owner(), _eauToken.balanceOf(address(this)).sub(eauForChallengers));
         _closed = true;
     }
 
@@ -258,11 +294,11 @@ contract Vault is IVault, Ownable {
 
 
     function getTotalDebt() notClosed public view override returns (uint debt) {
-        return getTotalDebt(_timeProvider.getTime());
+        return _getTotalDebt(_timeProvider.getTime());
     }
 
-    function getTotalDebt(uint time) notClosed public view override returns (uint debt) {
-        debt = _principal.add(getFees(time));
+    function _getTotalDebt(uint time) notClosed private view returns (uint debt) {
+        debt = _principal.add(_getFees(time));
         return debt;
     }
 
@@ -271,22 +307,26 @@ contract Vault is IVault, Ownable {
     }
 
     function getFees() notClosed public view override returns (uint) {
-        return getFees(_timeProvider.getTime());
+        return _getFees(_timeProvider.getTime());
     }
 
-    function getFees(uint time) notClosed public view override returns (uint fees) {
+    function _getFees(uint time) notClosed private view returns (uint fees) {
         (fees,) = _calculateFeesAccrued(time);
         return fees;
     }
 
+    function getCreditLimit() public view override returns (uint) {
+        return _tokenAmount.mul(getPrice()).div(4);
+    }
+
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
-    function getCreditLimit() notClosed public view override returns (uint) {
-        uint loan = getTotalDebt(_timeProvider.getTime());
-        uint totalLoan = _tokenAmount.mul(_price).div(4);
-        if (totalLoan <= loan) {
+    function canBorrow() notClosed public view override returns (uint) {
+        uint debt = _getTotalDebt(_timeProvider.getTime());
+        uint creditLimit = getCreditLimit();
+        if (creditLimit <= debt) {
             return 0;
         } else {
-            return totalLoan.sub(loan);
+            return creditLimit.sub(debt);
         }
     }
 
@@ -294,15 +334,16 @@ contract Vault is IVault, Ownable {
      * Checks if credit limit is breached
      */
     function isLimitBreached() notClosed public view returns (bool) {
-        return getTotalDebt(_timeProvider.getTime()) != 0 && getCreditLimit() == 0;
+        return _getTotalDebt(_timeProvider.getTime()) != 0 && canBorrow() == 0;
     }
 
     /**
      * Get user token price
      * Initially assessed by the vault owner, may be reduced during Initial Liquidity Vault Auction
+     * Cannot be less than challenged price (if challenged)
      */
     function getPrice() public view override returns (uint price) {
-        return _getDutchAuctionPrice();
+        return Math.max(_getDutchAuctionPrice(), _challengers[_challengeWinnerAddress].price);
     }
 
     /**
@@ -323,10 +364,78 @@ contract Vault is IVault, Ownable {
         if (_closed) return VaultState.Closed;
         if (_slashed && (getTotalDebt() != 0)) return VaultState.WaitingForClgnAuction;
         if (_slashed) return VaultState.Slashed;
-        if (_closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000)) return VaultState.WaitingForSlashing;
+        // tkns sold out or challenge has happened
+        if (_tokenAmount == 0
+        || (_challengeWinnerAddress != address(0)) && getPrice() == _challengers[_challengeWinnerAddress].price) return VaultState.SoldOut;
+        if (_initialAuctionIsOver()) return VaultState.WaitingForSlashing;
         if (isLimitBreached() && _closeOutTime != 0) return VaultState.InitialLiquidityAuctionInProcess;
         if (isLimitBreached() && _closeOutTime == 0) return VaultState.Defaulted;
         return VaultState.Trading;
+    }
+
+    // @dev See {IVault-challenge}
+    function challenge(uint price, uint eauToLock) initialAuctionIsNotOver public override {
+        uint currentPrice = getPrice();
+        require(price != 0, "Vault:challenge: price cannot be 0");
+        require(price < currentPrice, "Vault:challenge: price too high");
+        require(eauToLock >= _tokenAmount * price, "Vault:challenge: lock amount in EAU not enough");
+        require(_eauToken.transferFrom(msg.sender, address(this), eauToLock), "Vault:challenge: cannot transfer EAU.");
+        eauForChallengers += eauToLock;
+        Challenge memory newChallenge = Challenge(price, eauToLock);
+        _challengers[msg.sender] = newChallenge;
+        if (price > _challengers[_challengeWinnerAddress].price) {
+            _challengeWinnerAddress = msg.sender;
+        }
+    }
+
+    // @dev See {IVault-redeemChallenge}
+    function redeemChallenge() public override returns (uint eauAmount, uint userTokenAmount) {
+        (eauAmount, userTokenAmount) = getRedeemableChallenge(msg.sender);
+
+        // buy user tokens if Initial Liquidity auction passed
+        if (userTokenAmount != 0) {
+            _buy(address(this), userTokenAmount, _challengers[msg.sender].price, msg.sender);
+            _challengers[msg.sender].eauAmountToLock = 0;
+        } else {
+            _challengers[msg.sender].eauAmountToLock -= eauAmount;
+        }
+
+        require(_eauToken.transfer(msg.sender, eauAmount), "Vault:redeemChallenge(): cannot transfer EAU");
+        eauForChallengers -= eauAmount;
+
+        return (eauAmount, userTokenAmount);
+    }
+
+    // @dev See {IVault-getChallengeLocked}
+    function getChallengeLocked(address challenger) public override view returns (uint eauLocked) {
+        if (challenger == _challengeWinnerAddress) {
+            return _challengers[_challengeWinnerAddress].price.mul(_tokenAmount);
+        }
+        return 0;
+    }
+
+    // @dev See {IVault-getRedeemableChallenge}
+    function getRedeemableChallenge(address challenger) public override view returns (uint eauAmount, uint userTokenAmount) {
+        userTokenAmount = 0;
+        eauAmount = _challengers[challenger].eauAmountToLock;
+
+        if (challenger == _challengeWinnerAddress) {
+            uint price = getPrice();
+            eauAmount -= _tokenAmount * _challengers[challenger].price;
+
+            // if Initial Liquidity auction passed
+            if (price == _challengers[challenger].price) {
+                // calculate eau spent
+                userTokenAmount = _tokenAmount;
+            }
+        }
+
+        return (eauAmount, userTokenAmount);
+    }
+
+    // @dev See {IVault-getChallengeWinner}
+    function getChallengeWinner() public view override returns (address, uint) {
+        return (_challengeWinnerAddress, _challengers[_challengeWinnerAddress].price);
     }
 
     function _recordAccounting(AccountingRecordType recordType, uint amount, uint time) private {
@@ -471,6 +580,11 @@ contract Vault is IVault, Ownable {
         require(sold <= maxClgnAmount, "Vault::sellCLGN(): CLGN sold is more than expected");
         require(bought == exactEauAmount, "Vault::sellCLGN(): not exact amount of EAU bought for CLGN");
         return bought;
+    }
+
+    function _initialAuctionIsOver() internal view returns (bool) {
+        // 180000 is a length of Initial Liquidity Auction in seconds
+        return _closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000);
     }
 }
 

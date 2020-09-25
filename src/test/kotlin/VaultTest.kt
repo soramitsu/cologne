@@ -86,29 +86,8 @@ class VaultTest {
         assertEquals(initialAmount, userToken.balanceOf(vault.contractAddress).send())
         assertEquals(BigInteger.ZERO, userToken.balanceOf(owner).send())
         assertEquals(tokenPrice, vault.price.send())
-        assertEquals(BigInteger.valueOf(50), vault.creditLimit.send())
+        assertEquals(BigInteger.valueOf(50), vault.canBorrow().send())
         assertEquals(initialAmount, vault.tokenAmount.send())
-    }
-
-    /**
-     * @given owner borrowed 100'000 EAU
-     * @when calculate total debt 1 year later called
-     * @then 110276 EAU returned (10276 EAU accrued as interest)
-     */
-    @Test
-    fun feesAccruedOneYearLater() {
-        val initialAmount = BigInteger.valueOf(500_000)
-        val tokenPrice = BigInteger.valueOf(4)
-        ownerCreatesVault(initialAmount, tokenPrice)
-        val toBorrow = BigInteger.valueOf(100_000)
-
-        vault.borrow(toBorrow).send()
-
-        assertEquals(toBorrow, vault.principal.send())
-        val timestamp = helper.timeProvider.time.send()
-        val oneYearLater = timestamp.plus(BigInteger.valueOf(31536000));
-        helper.timeProvider.setTime(timestamp)
-        assertEquals(BigInteger.valueOf(110276), vault.getTotalDebt(oneYearLater).send())
     }
 
     /**
@@ -177,15 +156,14 @@ class VaultTest {
         ownerCreatesVault(initialAmount, tokenPrice)
         val initialEauSupply = helper.eauToken.totalSupply().send()
         val initialOwnerEauBalance = helper.eauToken.balanceOf(owner).send()
-        val toBorrow = vault.creditLimit.send()
+        val toBorrow = vault.canBorrow().send()
 
         vault.borrow(toBorrow).send()
 
         assertEquals(initialEauSupply.plus(toBorrow), helper.eauToken.totalSupply().send())
         assertEquals(initialOwnerEauBalance.plus(toBorrow), helper.eauToken.balanceOf(owner).send())
         assertEquals(toBorrow, vault.principal.send())
-        val timestamp = helper.timeProvider.time.send()
-        assertEquals(toBorrow, vault.getTotalDebt(timestamp).send())
+        assertEquals(toBorrow, vault.getTotalDebt().send())
     }
 
     /**
@@ -213,7 +191,7 @@ class VaultTest {
     @Test
     fun borrowExceedsLimit() {
         ownerCreatesVault(initialAmount, tokenPrice)
-        val toBorrow = vault.creditLimit.send()
+        val toBorrow = vault.canBorrow().send()
         vault.borrow(toBorrow).send()
 
         assertThrows<TransactionException> {
@@ -251,7 +229,6 @@ class VaultTest {
         ownerCreatesVault(initialAmount, tokenPrice)
         val debtBefore = BigInteger.valueOf(100_000)
         vault.borrow(debtBefore).send()
-        val timestamp = helper.timeProvider.time.send()
         val toPayOff = BigInteger.valueOf(50_000)
         val initialEauSupply = eauToken.totalSupply().send()
         val balanceBefore = eauToken.balanceOf(owner).send()
@@ -259,7 +236,7 @@ class VaultTest {
         eauToken.approve(vault.contractAddress, toPayOff).send()
         vault.payOff(toPayOff).send()
 
-        val newDebt = vault.getTotalDebt(timestamp).send()
+        val newDebt = vault.getTotalDebt().send()
         assertEquals(debtBefore.minus(toPayOff), newDebt)
         assertEquals(initialEauSupply.minus(toPayOff), eauToken.totalSupply().send())
         assertEquals(balanceBefore.minus(toPayOff), eauToken.balanceOf(owner).send())
