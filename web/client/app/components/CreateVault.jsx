@@ -63,7 +63,6 @@ export default class CreateVault extends React.Component {
     // create vault itself
     await cologneDaoContract.createVault(
       tokenAddress,
-      ethers.utils.parseEther(toStake),
       ethers.utils.parseEther(tokenAmount),
       ethers.utils.parseEther(vaultValue),
     );
@@ -123,13 +122,6 @@ export default class CreateVault extends React.Component {
                 onChange={this.handleChange}
               />
             </Form.Field>
-
-            <Form.Checkbox
-              label="Staking enabled"
-              name="isStaking"
-              checked={isStaking}
-              onChange={this.handleStakingChange}
-            />
 
             {isStaking && (
               <Form.Field>

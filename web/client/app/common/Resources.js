@@ -159,23 +159,11 @@ export const clgnTokenAbi = [
 export const cologneDaoAbi = [
   {
     inputs: [
-      {
-        internalType: "address",
-        name: "mdlyToken",
-        type: "address",
-      },
+      {internalType: "address", name: "clgnToken", type: "address"},
       {internalType: "address", name: "eauToken", type: "address"},
-      {
-        internalType: "address",
-        name: "mdlyPriceOracle",
-        type: "address",
-      },
-      {internalType: "address", name: "mdlyMarket", type: "address"},
-      {
-        internalType: "address",
-        name: "timeProvider",
-        type: "address",
-      },
+      {internalType: "address", name: "clgnPriceOracle", type: "address"},
+      {internalType: "address", name: "clgnMarket", type: "address"},
+      {internalType: "address", name: "timeProvider", type: "address"},
     ],
     stateMutability: "nonpayable",
     type: "constructor",
@@ -184,12 +172,7 @@ export const cologneDaoAbi = [
     anonymous: false,
     inputs: [
       {indexed: true, internalType: "address", name: "vault", type: "address"},
-      {
-        indexed: true,
-        internalType: "address",
-        name: "owner",
-        type: "address",
-      },
+      {indexed: true, internalType: "address", name: "owner", type: "address"},
     ],
     name: "VaultCreation",
     type: "event",
@@ -197,17 +180,8 @@ export const cologneDaoAbi = [
   {
     inputs: [
       {internalType: "address", name: "token", type: "address"},
-      {
-        internalType: "uint256",
-        name: "stake",
-        type: "uint256",
-      },
       {internalType: "uint256", name: "initialAmount", type: "uint256"},
-      {
-        internalType: "uint256",
-        name: "tokenPrice",
-        type: "uint256",
-      },
+      {internalType: "uint256", name: "tokenPrice", type: "uint256"},
     ],
     name: "createVault",
     outputs: [{internalType: "address", name: "", type: "address"}],
@@ -216,14 +190,7 @@ export const cologneDaoAbi = [
   },
   {
     inputs: [],
-    name: "getEauTokenAddress",
-    outputs: [{internalType: "address", name: "", type: "address"}],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "getMdlyMarket",
+    name: "getClgnMarket",
     outputs: [
       {internalType: "contract IMarketAdaptor", name: "", type: "address"},
     ],
@@ -232,7 +199,7 @@ export const cologneDaoAbi = [
   },
   {
     inputs: [],
-    name: "getMdlyPriceOracle",
+    name: "getClgnPriceOracle",
     outputs: [
       {internalType: "contract IPriceOracle", name: "", type: "address"},
     ],
@@ -241,7 +208,14 @@ export const cologneDaoAbi = [
   },
   {
     inputs: [],
-    name: "getMdlyTokenAddress",
+    name: "getClgnTokenAddress",
+    outputs: [{internalType: "address", name: "", type: "address"}],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getEauTokenAddress",
     outputs: [{internalType: "address", name: "", type: "address"}],
     stateMutability: "view",
     type: "function",
@@ -256,13 +230,9 @@ export const cologneDaoAbi = [
   {
     inputs: [
       {internalType: "address", name: "beneficiary", type: "address"},
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
+      {internalType: "uint256", name: "amount", type: "uint256"},
     ],
-    name: "mintEAU",
+    name: "mintCLGN",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -270,13 +240,9 @@ export const cologneDaoAbi = [
   {
     inputs: [
       {internalType: "address", name: "beneficiary", type: "address"},
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
+      {internalType: "uint256", name: "amount", type: "uint256"},
     ],
-    name: "mintMDLY",
+    name: "mintEAU",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -439,7 +405,6 @@ export const vaultAbi = [
   {
     inputs: [
       {internalType: "address", name: "owner", type: "address"},
-      {internalType: "uint256", name: "stake", type: "uint256"},
       {internalType: "address", name: "token", type: "address"},
       {internalType: "uint256", name: "initialAmount", type: "uint256"},
       {internalType: "uint256", name: "tokenPrice", type: "uint256"},
@@ -563,7 +528,9 @@ export const vaultAbi = [
   {
     inputs: [],
     name: "getState",
-    outputs: [],
+    outputs: [
+      {internalType: "enum IVault.VaultState", name: "", type: "uint8"},
+    ],
     stateMutability: "view",
     type: "function",
   },
@@ -624,6 +591,13 @@ export const vaultAbi = [
     type: "function",
   },
   {
+    inputs: [{internalType: "uint256", name: "amount", type: "uint256"}],
+    name: "stake",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "startInitialLiquidityAuction",
     outputs: [],
@@ -639,6 +613,36 @@ export const vaultAbi = [
   },
 ];
 
+export const timeProviderAbi = [
+  {inputs: [], stateMutability: "nonpayable", type: "constructor"},
+  {
+    inputs: [],
+    name: "getTime",
+    outputs: [{internalType: "uint256", name: "", type: "uint256"}],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{internalType: "uint256", name: "time", type: "uint256"}],
+    name: "setTime",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+];
+
+export const VaultStates = [
+  "Trading",
+  "Defaulted",
+  "InitialLiquidityAuctionInProcess",
+  "WaitingForSlashing",
+  "WaitingForClgnAuction",
+  "Slashed",
+  "Closed",
+];
+
+export const stateFormatter = (state) => VaultStates[state];
+
 export const provider = new ethers.providers.Web3Provider(window.ethereum);
 export const signer = provider.getSigner();
 
@@ -646,6 +650,7 @@ export const multiplier = 1000000000000000000;
 
 export const cologneDaoAddress = "0x79eafd0b5ec8d3f945e6bb2817ed90b046c0d0af";
 export const userTokenAddress = "0x7d73424a8256c0b2ba245e5d5a3de8820e45f390";
+export const timeProviderAddress = "0x6e05f58eedda592f34dd9105b1827f252c509de0";
 
 export const userTokenContract = new ethers.Contract(
   userTokenAddress,
@@ -656,5 +661,11 @@ export const userTokenContract = new ethers.Contract(
 export const cologneDaoContract = new ethers.Contract(
   cologneDaoAddress,
   cologneDaoAbi,
+  signer,
+);
+
+export const timeProviderContract = new ethers.Contract(
+  timeProviderAddress,
+  timeProviderAbi,
   signer,
 );

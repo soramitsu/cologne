@@ -2,8 +2,14 @@ import React from "react";
 import {connect} from "react-redux";
 import {Container, Header, Table} from "semantic-ui-react";
 import ethers from "ethers";
-import {cologneDaoContract, vaultAbi, signer} from "../common/Resources";
+import {
+  cologneDaoContract,
+  vaultAbi,
+  signer,
+  stateFormatter,
+} from "../common/Resources";
 import CreateVault from "./CreateVault";
+import VaultsActions from "./VaultsActions";
 
 class VaultsList extends React.Component {
   state = {
@@ -50,17 +56,24 @@ class VaultsList extends React.Component {
           await vaultContract.getTokenAmount(),
         );
 
+        const vaultState = await vaultContract.getState();
+
         const creditLimit = ethers.utils.formatEther(
           await vaultContract.getCreditLimit(),
         );
 
+        const isOwner = await vaultContract.isOwner();
+
         return {
+          vaultContract,
+          isOwner,
           address: vault,
           price,
           collateral,
           totalDebt,
           tokenAmount,
           creditLimit,
+          vaultState,
         };
       }),
     );
@@ -88,6 +101,9 @@ class VaultsList extends React.Component {
               <Table.HeaderCell>Total debt</Table.HeaderCell>
               <Table.HeaderCell>Total amount</Table.HeaderCell>
               <Table.HeaderCell>Credit limit</Table.HeaderCell>
+              <Table.HeaderCell>Vault state</Table.HeaderCell>
+              <Table.HeaderCell>Owned by you</Table.HeaderCell>
+              <Table.HeaderCell>Actions</Table.HeaderCell>
             </Table.Row>
           </Table.Header>
 
@@ -112,6 +128,13 @@ class VaultsList extends React.Component {
                 <Table.Cell>
                   <Header as="h4">{item.creditLimit}</Header>
                 </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{stateFormatter(item.vaultState)}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.isOwner ? "Yes" : "No"}</Header>
+                </Table.Cell>
+                <VaultsActions item={item} />
               </Table.Row>
             ))}
           </Table.Body>
