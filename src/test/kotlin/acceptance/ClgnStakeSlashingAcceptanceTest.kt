@@ -40,7 +40,7 @@ class ClgnStakeSlashingAcceptanceTest {
     lateinit var eauToken: EAUToken
     lateinit var clgnToken: CLGNToken
     lateinit var ownerVault: Vault
-    lateinit var auctionIntiatorVault: Vault
+    lateinit var auctionInitiatorVault: Vault
     lateinit var slashingInitiatorVault: Vault
 
     @BeforeEach
@@ -63,7 +63,7 @@ class ClgnStakeSlashingAcceptanceTest {
     ) {
         val vaultAddress = helper.createVault(owner, amount, price)
         ownerVault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
-        auctionIntiatorVault = Vault.load(ownerVault.contractAddress, helper.web3, auctionInitiator, helper.gasProvider)
+        auctionInitiatorVault = Vault.load(ownerVault.contractAddress, helper.web3, auctionInitiator, helper.gasProvider)
         slashingInitiatorVault =
             Vault.load(ownerVault.contractAddress, helper.web3, slashingIntiator, helper.gasProvider)
 
@@ -148,7 +148,7 @@ class ClgnStakeSlashingAcceptanceTest {
         ownerCreatesVault(amount = BigInteger.valueOf(16000), stake = BigInteger.valueOf(1000))
         val initialClgnSupply = clgnToken.totalSupply().send()
         breachVault()
-        auctionIntiatorVault.startInitialLiquidityAuction().send()
+        auctionInitiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
         assertEquals(VaultState.WaitingForSlashing.toBigInteger(), ownerVault.state.send())
 
@@ -175,7 +175,7 @@ class ClgnStakeSlashingAcceptanceTest {
         helper.passTime(BigInteger.valueOf(5 * 24 * 3600))
         assertNotEquals(BigInteger.ZERO, ownerVault.fees.send())
         // start and fail Initial Liquidity Auction
-        auctionIntiatorVault.startInitialLiquidityAuction().send()
+        auctionInitiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
 
         slashingInitiatorVault.slash().send()
@@ -202,7 +202,7 @@ class ClgnStakeSlashingAcceptanceTest {
         helper.passTime(BigInteger.valueOf(100 * 24 * 3600))
         assertTrue(ownerVault.fees.send() > BigInteger.TWO)
         // start and fail Initial Liquidity Auction
-        auctionIntiatorVault.startInitialLiquidityAuction().send()
+        auctionInitiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
 
         slashingInitiatorVault.slash().send()
@@ -228,7 +228,7 @@ class ClgnStakeSlashingAcceptanceTest {
         helper.passTime(BigInteger.valueOf(50 * 24 * 3600))
         assertEquals(BigInteger.valueOf(100), ownerVault.fees.send())
         // start and fail Initial Liquidity Auction
-        auctionIntiatorVault.startInitialLiquidityAuction().send()
+        auctionInitiatorVault.startInitialLiquidityAuction().send()
         failInitialAuction()
 
         slashingInitiatorVault.slash().send()

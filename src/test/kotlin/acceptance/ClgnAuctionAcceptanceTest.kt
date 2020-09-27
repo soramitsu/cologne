@@ -31,7 +31,6 @@ class ClgnAuctionAcceptanceTest {
 
     val initialAmount = BigInteger.valueOf(4000)
     val tokenPrice = BigInteger.ONE
-    val initialStake = BigInteger.ZERO
     lateinit var helper: ContractTestHelper
     lateinit var owner: Credentials
     lateinit var auctionInitiator: Credentials
@@ -60,8 +59,7 @@ class ClgnAuctionAcceptanceTest {
      */
     fun ownerCreatesVault(
         amount: BigInteger = initialAmount,
-        price: BigInteger = tokenPrice,
-        stake: BigInteger = initialStake
+        price: BigInteger = tokenPrice
     ) {
         val vaultAddress = helper.createVault(owner, amount, price)
         ownerVault = helper.vaultByOwner
@@ -123,7 +121,7 @@ class ClgnAuctionAcceptanceTest {
      */
     @Test
     fun coverShortfallNotSlashed() {
-        ownerCreatesVault(stake = BigInteger.TEN)
+        ownerCreatesVault()
         breachVault()
         failInitialAuction()
 

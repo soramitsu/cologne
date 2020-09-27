@@ -12,7 +12,7 @@ import java.math.BigInteger
  * Vault states
  */
 enum class VaultState {
-    Trading, Defaulted, InitialLiquidityAuctionInProcess, WaitingForSlashing, WaitingForClgnAuction, Slashed, Closed;
+    Trading, Defaulted, InitialLiquidityAuctionInProcess, WaitingForSlashing, WaitingForClgnAuction, Slashed, Closed, SoldOut;
 
     fun toBigInteger(): BigInteger {
         return BigInteger.valueOf(this.ordinal.toLong())
@@ -28,7 +28,7 @@ class ContractTestHelper(host: String, port: Int) {
             HttpUrl.Builder().scheme("http").host(host).port(port).build().toString()
         )
     )
-    val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(4_500_000))
+    val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(5_000_000))
 
     // Ethereum wallets
     val credentialsSeed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
@@ -97,6 +97,12 @@ class ContractTestHelper(host: String, port: Int) {
         eauToken.transfer(address, amount).send()
     }
 
+    fun addAndApproveEAU(account: Credentials, spender: String, amount: BigInteger) {
+        addEAU(account.address, amount)
+        val eauTokenByAccount = EAUToken.load(eauToken.contractAddress, web3, account, gasProvider)
+        eauTokenByAccount.approve(spender, amount).send()
+    }
+
     /**
      * Creates vault with owner provided by credentials
      * @param owner - the owner of vault
@@ -113,8 +119,6 @@ class ContractTestHelper(host: String, port: Int) {
         // User token by credentials
         val tokenByOwner = UserToken.load(userToken.contractAddress, web3, owner, gasProvider)
         tokenByOwner.approve(medleyDAO.contractAddress, userTokenAmount).send()
-
-        val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, web3, owner, gasProvider)
 
         val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
         val tx =
@@ -145,7 +149,14 @@ class ContractTestHelper(host: String, port: Int) {
      * Breach credit limit
      */
     fun breachVault() {
-        val toBorrow = vaultByOwner.creditLimit.send()
+        val toBorrow = vaultByOwner.canBorrow().send()
         vaultByOwner.borrow(toBorrow).send()
+    }
+
+    fun getBalances(account: String): Triple<BigInteger, BigInteger, BigInteger> {
+        val tkns = userToken.balanceOf(account).send()
+        val eaus = eauToken.balanceOf(account).send()
+        val clgns = clgnToken.balanceOf(account).send()
+        return Triple(tkns, eaus, clgns);
     }
 }

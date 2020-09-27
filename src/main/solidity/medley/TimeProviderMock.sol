@@ -12,6 +12,7 @@ contract TimeProviderMock is ITimeProvider {
     }
 
     function setTime(uint time) public {
+        require(time >= _time, "TimeProviderMock: Cannot set past time.");
         _time = time;
     }
 

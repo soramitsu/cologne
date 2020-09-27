@@ -65,7 +65,6 @@ class InitialLiquidityAuctionAcceptanceTest {
      * Deploy vault with Owner credentials
      */
     fun ownerCreatesVault(amount: BigInteger = initialAmount, price: BigInteger = tokenPrice) {
-        val stake = BigInteger.valueOf(20)
         val vaultAddress = helper.createVault(owner, amount, price)
         vault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
         intiatorVault = Vault.load(vault.contractAddress, helper.web3, intitator, helper.gasProvider)
@@ -76,7 +75,7 @@ class InitialLiquidityAuctionAcceptanceTest {
      * Breach credit limit
      */
     fun breachVault() {
-        val toBorrow = vault.creditLimit.send()
+        val toBorrow = vault.canBorrow().send()
         vault.borrow(toBorrow).send()
     }
 
@@ -208,14 +207,15 @@ class InitialLiquidityAuctionAcceptanceTest {
 
     /**
      * @given A breached vault with close-out process started. The vault has 100 TKN at price TKN/EAU = 2 and debt is
-     * 50 EAU.
+     * 50 EAU. Credit limit is 50 EAU.
      * @when a buyer buys 1 TKN for 2 EAU
-     * @then the debt is paid off partially and breach is covered
+     * @then the debt is paid off partially and breach is covered. Vault debt is 48 EAU, credit limit is 49 EAU (for 99
+     * TKN) and can borrow 1 EAU
      */
     @Test
     fun buyTokensToCoverBreach() {
         ownerCreatesVault()
-        val toBorrow = vault.creditLimit.send()
+        val toBorrow = vault.canBorrow().send()
         breachVault()
         vault.startInitialLiquidityAuction().send()
         val toBuy = BigInteger.ONE
@@ -228,7 +228,8 @@ class InitialLiquidityAuctionAcceptanceTest {
 
         assertEquals(false, vault.isLimitBreached.send())
         assertEquals(toBorrow.minus(costInEau), vault.totalDebt.send())
-        assertEquals(costInEau, vault.creditLimit.send())
+        assertEquals(BigInteger.valueOf(49), vault.creditLimit.send())
+        assertEquals(BigInteger.ONE, vault.canBorrow().send())
     }
 
     /**
@@ -241,7 +242,7 @@ class InitialLiquidityAuctionAcceptanceTest {
     @Test
     fun buyTokensToCoverBreachAfterTime() {
         ownerCreatesVault()
-        val toBorrow = vault.creditLimit.send()
+        val toBorrow = vault.canBorrow().send()
         breachVault()
         vault.startInitialLiquidityAuction().send()
         helper.passTime(BigInteger.valueOf(30 * 60 * 50))
@@ -262,7 +263,7 @@ class InitialLiquidityAuctionAcceptanceTest {
         // old debt - (payed in EAU - 10% penalty)
         val expectedDebt = toBorrow.minus(costInEau.minus(costInEau.divide(BigInteger.TEN)))
         assertEquals(expectedDebt, vault.totalDebt.send())
-        assertEquals(BigInteger.ZERO, vault.creditLimit.send())
+        assertEquals(BigInteger.ZERO, vault.canBorrow().send())
     }
 
     /**
