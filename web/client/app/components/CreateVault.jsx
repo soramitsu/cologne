@@ -2,10 +2,8 @@ import ethers from "ethers";
 import React from "react";
 import {Button, Container, Form} from "semantic-ui-react";
 import {
-  clgnTokenAbi,
   cologneDaoAddress,
   cologneDaoContract,
-  signer,
   userTokenContract,
 } from "../common/Resources";
 
@@ -23,18 +21,10 @@ export default class CreateVault extends React.Component {
     this.setState({[name]: value});
   };
 
-  handleStakingChange = () => {
-    this.setState((prevState) => ({
-      isStaking: !prevState.isStaking,
-    }));
-  };
-
   handleSubmit = async () => {
     const {
       tokenAddress,
       vaultValue,
-      isStaking,
-      stakingAmount,
       tokenAmount,
     } = this.state;
 
@@ -43,22 +33,6 @@ export default class CreateVault extends React.Component {
       cologneDaoAddress,
       ethers.utils.parseEther(tokenAmount),
     );
-
-    const toStake = isStaking ? stakingAmount : "0";
-
-    // approve tx should be sent first for clgn token contract
-    if (isStaking) {
-      const clgnTokenAddress = await cologneDaoContract.getMdlyTokenAddress();
-      const clgnTokenContract = new ethers.Contract(
-        clgnTokenAddress,
-        clgnTokenAbi,
-        signer,
-      );
-      await clgnTokenContract.approve(
-        cologneDaoAddress,
-        ethers.utils.parseEther(toStake),
-      );
-    }
 
     // create vault itself
     await cologneDaoContract.createVault(
@@ -79,7 +53,7 @@ export default class CreateVault extends React.Component {
     } = this.state;
 
     return (
-      <Container>
+      <Container style={{marginTop: "1em"}}>
         <Button
           color="green"
           onClick={() => {

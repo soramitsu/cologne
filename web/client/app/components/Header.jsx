@@ -47,8 +47,6 @@ class Header extends React.Component {
 
     const {time} = this.state;
 
-    console.log(time);
-
     return (
       <Menu fixed="top">
         <Container>

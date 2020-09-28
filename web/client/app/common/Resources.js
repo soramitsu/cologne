@@ -471,6 +471,23 @@ export const vaultAbi = [
   },
   {
     inputs: [],
+    name: "canBorrow",
+    outputs: [{internalType: "uint256", name: "", type: "uint256"}],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {internalType: "uint256", name: "price", type: "uint256"},
+      {internalType: "uint256", name: "eauToLock", type: "uint256"},
+    ],
+    name: "challenge",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "close",
     outputs: [],
     stateMutability: "nonpayable",
@@ -484,6 +501,23 @@ export const vaultAbi = [
     type: "function",
   },
   {
+    inputs: [{internalType: "address", name: "challenger", type: "address"}],
+    name: "getChallengeLocked",
+    outputs: [{internalType: "uint256", name: "eauLocked", type: "uint256"}],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getChallengeWinner",
+    outputs: [
+      {internalType: "address", name: "", type: "address"},
+      {internalType: "uint256", name: "", type: "uint256"},
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "getCollateralInEau",
     outputs: [{internalType: "uint256", name: "", type: "uint256"}],
@@ -494,13 +528,6 @@ export const vaultAbi = [
     inputs: [],
     name: "getCreditLimit",
     outputs: [{internalType: "uint256", name: "", type: "uint256"}],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [{internalType: "uint256", name: "time", type: "uint256"}],
-    name: "getFees",
-    outputs: [{internalType: "uint256", name: "fees", type: "uint256"}],
     stateMutability: "view",
     type: "function",
   },
@@ -522,6 +549,16 @@ export const vaultAbi = [
     inputs: [],
     name: "getPrincipal",
     outputs: [{internalType: "uint256", name: "", type: "uint256"}],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{internalType: "address", name: "challenger", type: "address"}],
+    name: "getRedeemableChallenge",
+    outputs: [
+      {internalType: "uint256", name: "eauAmount", type: "uint256"},
+      {internalType: "uint256", name: "userTokenAmount", type: "uint256"},
+    ],
     stateMutability: "view",
     type: "function",
   },
@@ -573,6 +610,16 @@ export const vaultAbi = [
     inputs: [{internalType: "uint256", name: "amount", type: "uint256"}],
     name: "payOff",
     outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "redeemChallenge",
+    outputs: [
+      {internalType: "uint256", name: "eauAmount", type: "uint256"},
+      {internalType: "uint256", name: "userTokenAmount", type: "uint256"},
+    ],
     stateMutability: "nonpayable",
     type: "function",
   },
@@ -639,14 +686,13 @@ export const VaultStates = [
   "WaitingForClgnAuction",
   "Slashed",
   "Closed",
+  "SoldOut",
 ];
 
 export const stateFormatter = (state) => VaultStates[state];
 
 export const provider = new ethers.providers.Web3Provider(window.ethereum);
 export const signer = provider.getSigner();
-
-export const multiplier = 1000000000000000000;
 
 export const cologneDaoAddress = "0x79eafd0b5ec8d3f945e6bb2817ed90b046c0d0af";
 export const userTokenAddress = "0x7d73424a8256c0b2ba245e5d5a3de8820e45f390";

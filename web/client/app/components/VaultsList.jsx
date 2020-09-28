@@ -1,6 +1,6 @@
 import React from "react";
 import {connect} from "react-redux";
-import {Container, Header, Table} from "semantic-ui-react";
+import {Container, Grid, GridRow, Header, Table} from "semantic-ui-react";
 import ethers from "ethers";
 import {
   cologneDaoContract,
@@ -59,7 +59,7 @@ class VaultsList extends React.Component {
         const vaultState = await vaultContract.getState();
 
         const creditLimit = ethers.utils.formatEther(
-          await vaultContract.getCreditLimit(),
+          await vaultContract.canBorrow(),
         );
 
         const isOwner = await vaultContract.isOwner();
@@ -88,7 +88,11 @@ class VaultsList extends React.Component {
 
     return (
       <Container>
-        <CreateVault />
+        <Grid.Row>
+          <Grid.Column>
+            <CreateVault />
+          </Grid.Column>
+        </Grid.Row>
 
         <Header as="h3">Deployed Vaults</Header>
 
@@ -98,8 +102,8 @@ class VaultsList extends React.Component {
               <Table.HeaderCell>Address</Table.HeaderCell>
               <Table.HeaderCell>Price in EAU</Table.HeaderCell>
               <Table.HeaderCell>Collateral in EAU</Table.HeaderCell>
-              <Table.HeaderCell>Total debt</Table.HeaderCell>
-              <Table.HeaderCell>Total amount</Table.HeaderCell>
+              <Table.HeaderCell>Total debt in EAU</Table.HeaderCell>
+              <Table.HeaderCell>Token amount</Table.HeaderCell>
               <Table.HeaderCell>Credit limit</Table.HeaderCell>
               <Table.HeaderCell>Vault state</Table.HeaderCell>
               <Table.HeaderCell>Owned by you</Table.HeaderCell>

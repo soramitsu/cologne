@@ -10,14 +10,11 @@ class MainPage extends React.Component {
     return (
       <Container>
         <Header as="h2">User dashboard</Header>
+        <ServiceActions />
         <Grid>
           <Grid.Row>
-            <Grid.Column width={14}>
+            <Grid.Column>
               <VaultsList />
-            </Grid.Column>
-
-            <Grid.Column width={2}>
-              <ServiceActions />
             </Grid.Column>
           </Grid.Row>
         </Grid>

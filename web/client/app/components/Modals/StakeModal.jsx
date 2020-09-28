@@ -2,8 +2,9 @@ import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
+import {clgnTokenAbi, cologneDaoContract, signer} from "../../common/Resources";
 
-export default class CloseModal extends React.Component {
+export default class StakeModal extends React.Component {
   state = {
     open: false,
     error: false,
@@ -30,8 +31,21 @@ export default class CloseModal extends React.Component {
       error: false,
     });
 
+    const clgnTokenAddress = await cologneDaoContract.getClgnTokenAddress();
+
+    const clgnTokenContract = new ethers.Contract(
+      clgnTokenAddress,
+      clgnTokenAbi,
+      signer,
+    );
+
+    await clgnTokenContract.approve(
+      vaultContract.address,
+      ethers.utils.parseEther(tokenAmount),
+    );
+
     const res = await vaultContract
-      .borrow(ethers.utils.parseEther(tokenAmount))
+      .stake(ethers.utils.parseEther(tokenAmount))
       .catch((error) => this.setState({error}));
 
     if (res) {
@@ -51,16 +65,9 @@ export default class CloseModal extends React.Component {
 
   formValidate = (values) => {
     const errors = {};
-    const {
-      item: {creditLimit},
-    } = this.props;
 
     if (!values.tokenAmount) {
       errors.tokenAmount = "Required";
-    } else if (
-      Number.parseFloat(creditLimit) < Number.parseFloat(values.tokenAmount)
-    ) {
-      errors.tokenAmount = "You can not exceed credit limit";
     }
 
     return errors;
@@ -75,9 +82,9 @@ export default class CloseModal extends React.Component {
         onClose={this.closeForm}
         onOpen={this.openForm}
         open={open}
-        trigger={<Dropdown.Item>Borrow</Dropdown.Item>}
+        trigger={<Dropdown.Item>Stake</Dropdown.Item>}
       >
-        <Modal.Header>Borrow from the vault</Modal.Header>
+        <Modal.Header>Stake CLGN</Modal.Header>
         <Modal.Content>
           <Formik
             innerRef={this.formRef}
@@ -95,7 +102,7 @@ export default class CloseModal extends React.Component {
             }) => (
               <Form onSubmit={handleSubmit}>
                 <Form.Input
-                  label="Amount to borrow"
+                  label="Amount to stake"
                   fluid
                   error={
                     errors.tokenAmount &&
@@ -129,7 +136,7 @@ export default class CloseModal extends React.Component {
           </Button>
           <Button
             type="submit"
-            content="Borrow"
+            content="Stake"
             color="green"
             onClick={this.formRef.current && this.formRef.current.handleSubmit}
             positive

@@ -1,4 +1,4 @@
-import {Button, Container, Grid, Header} from "semantic-ui-react";
+import {Button, Container, Header} from "semantic-ui-react";
 import React from "react";
 import {ethers} from "ethers";
 import {connect} from "react-redux";
@@ -9,7 +9,6 @@ import {
   timeProviderContract,
   userTokenContract,
 } from "../common/Resources";
-import {timeConverter} from "../common/Utils";
 
 class ServiceActions extends React.Component {
   state = {
@@ -38,6 +37,34 @@ class ServiceActions extends React.Component {
     );
 
     await clgnTokenContract.mint(account, ethers.utils.parseEther("13.37"));
+  };
+
+  transfer = async () => {
+    const marketAddress = await cologneDaoContract.getClgnMarket();
+    const clgnAddress = await cologneDaoContract.getClgnTokenAddress();
+    const eauTokenAddress = await cologneDaoContract.getEauTokenAddress();
+
+    const clgnTokenContract = new ethers.Contract(
+      clgnAddress,
+      clgnTokenAbi,
+      signer,
+    );
+
+    await clgnTokenContract.transfer(
+      marketAddress,
+      ethers.utils.parseEther("12376679"),
+    );
+
+    const eauTokenContract = new ethers.Contract(
+      eauTokenAddress,
+      clgnTokenAbi,
+      signer,
+    );
+
+    await eauTokenContract.transfer(
+      marketAddress,
+      ethers.utils.parseEther("12376679"),
+    );
   };
 
   timeTravel = async (param) => {
@@ -84,15 +111,13 @@ class ServiceActions extends React.Component {
             });
           }}
         >
-          {shown ? "Hide" : "Show"}
+          {shown ? "Hide service actions" : "Show service actions"}
         </Button>
         <Container
           style={{
             display: shown ? "block" : "none",
           }}
         >
-          <Header as="h4">Service actions</Header>
-
           <Button color="teal" onClick={this.mintUserToken}>
             Mint user tokens
           </Button>
@@ -100,9 +125,9 @@ class ServiceActions extends React.Component {
           <Button
             style={{marginTop: "1em"}}
             color="teal"
-            onClick={this.mintClgnToken}
+            onClick={this.transfer}
           >
-            Mint CLGN
+            Move CLGN to market
           </Button>
 
           <Button

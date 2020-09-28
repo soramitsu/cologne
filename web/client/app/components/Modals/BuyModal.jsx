@@ -2,8 +2,10 @@ import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
+import {connect} from "react-redux";
+import {clgnTokenAbi, cologneDaoContract, signer} from "../../common/Resources";
 
-export default class CloseModal extends React.Component {
+class BuyModal extends React.Component {
   state = {
     open: false,
     error: false,
@@ -21,17 +23,37 @@ export default class CloseModal extends React.Component {
   };
 
   handleSubmit = async (values) => {
-    const {tokenAmount} = values;
+    const {tokenAmount, maxPrice} = values;
     const {
       item: {vaultContract},
+      user: {account},
     } = this.props;
 
     this.setState({
       error: false,
     });
 
+    const eauTokenAddress = await cologneDaoContract.getEauTokenAddress();
+
+    const eauTokenContract = new ethers.Contract(
+      eauTokenAddress,
+      clgnTokenAbi,
+      signer,
+    );
+
+    await eauTokenContract.approve(
+      vaultContract.address,
+      ethers.utils.parseEther(
+        (Number.parseFloat(maxPrice) * Number.parseInt(tokenAmount)).toString(),
+      ),
+    );
+
     const res = await vaultContract
-      .borrow(ethers.utils.parseEther(tokenAmount))
+      .buy(
+        ethers.utils.parseEther(tokenAmount),
+        ethers.utils.parseEther(maxPrice),
+        account,
+      )
       .catch((error) => this.setState({error}));
 
     if (res) {
@@ -51,16 +73,13 @@ export default class CloseModal extends React.Component {
 
   formValidate = (values) => {
     const errors = {};
-    const {
-      item: {creditLimit},
-    } = this.props;
 
     if (!values.tokenAmount) {
       errors.tokenAmount = "Required";
-    } else if (
-      Number.parseFloat(creditLimit) < Number.parseFloat(values.tokenAmount)
-    ) {
-      errors.tokenAmount = "You can not exceed credit limit";
+    }
+
+    if (!values.maxPrice) {
+      errors.maxPrice = "Required";
     }
 
     return errors;
@@ -75,13 +94,13 @@ export default class CloseModal extends React.Component {
         onClose={this.closeForm}
         onOpen={this.openForm}
         open={open}
-        trigger={<Dropdown.Item>Borrow</Dropdown.Item>}
+        trigger={<Dropdown.Item>Buy</Dropdown.Item>}
       >
-        <Modal.Header>Borrow from the vault</Modal.Header>
+        <Modal.Header>Buy tokens from the contract</Modal.Header>
         <Modal.Content>
           <Formik
             innerRef={this.formRef}
-            initialValues={{tokenAmount: ""}}
+            initialValues={{tokenAmount: "", maxPrice: ""}}
             validate={this.formValidate}
             onSubmit={this.handleSubmit}
           >
@@ -94,20 +113,35 @@ export default class CloseModal extends React.Component {
               handleSubmit,
             }) => (
               <Form onSubmit={handleSubmit}>
-                <Form.Input
-                  label="Amount to borrow"
-                  fluid
-                  error={
-                    errors.tokenAmount &&
-                    touched.tokenAmount &&
-                    errors.tokenAmount
-                  }
-                  placeholder="100"
-                  name="tokenAmount"
-                  value={values.tokenAmount}
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                />
+                <Form.Group widths="equal">
+                  <Form.Input
+                    label="Amount to buy"
+                    fluid
+                    error={
+                      errors.tokenAmount &&
+                      touched.tokenAmount &&
+                      errors.tokenAmount
+                    }
+                    placeholder="100"
+                    name="tokenAmount"
+                    value={values.tokenAmount}
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                  />
+
+                  <Form.Input
+                    label="Maximum buy price"
+                    fluid
+                    error={
+                      errors.maxPrice && touched.maxPrice && errors.maxPrice
+                    }
+                    placeholder="10000"
+                    name="maxPrice"
+                    value={values.maxPrice}
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
               </Form>
             )}
           </Formik>
@@ -129,7 +163,7 @@ export default class CloseModal extends React.Component {
           </Button>
           <Button
             type="submit"
-            content="Borrow"
+            content="Buy"
             color="green"
             onClick={this.formRef.current && this.formRef.current.handleSubmit}
             positive
@@ -139,3 +173,9 @@ export default class CloseModal extends React.Component {
     );
   }
 }
+
+const mapStateToProps = (state) => ({
+  user: state.user,
+});
+
+export default connect(mapStateToProps)(BuyModal);
