@@ -70,8 +70,7 @@ class ContractTestHelper(host: String, port: Int) {
                 gasProvider,
                 clgnToken.contractAddress,
                 eauToken.contractAddress
-            )
-                .send()
+            ).send()
         timeProvider = TimeProviderMock.deploy(web3, credentialsSeed, gasProvider).send()
         medleyDAO = MedleyDAO.deploy(
             web3,
@@ -85,8 +84,12 @@ class ContractTestHelper(host: String, port: Int) {
         ).send()
         clgnToken.transferOwnership(medleyDAO.contractAddress).send()
         // some EAU for tests
-        eauToken.mint(credentialsSeed.address, BigInteger.valueOf(100000)).send()
+        eauToken.mint(credentialsSeed.address, BigInteger.valueOf(100_000_000_000)).send()
         eauToken.transferOwnership(medleyDAO.contractAddress).send()
+
+        // add liquidity to market
+        eauToken.transfer(marketAdaptor.contractAddress, BigInteger.valueOf(100_000_000)).send()
+        clgnToken.transfer(marketAdaptor.contractAddress, BigInteger.valueOf(100_000_000)).send()
     }
 
     fun addCLGN(address: String, amount: BigInteger) {
