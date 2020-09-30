@@ -125,12 +125,17 @@ class MarketAdaptorTest {
         helper.addEAU(market.contractAddress, BigInteger.TEN)
         helper.addCLGN(buyer, BigInteger.valueOf(5))
         buyerAllows(clgn, market.contractAddress, BigInteger.valueOf(5))
+        val oldEauMarketBalance = helper.eauToken.balanceOf(market.contractAddress).send()
+        val oldClgnMarketBalance = helper.clgnToken.balanceOf(market.contractAddress).send()
 
         market.swapExactTokensForTokens(BigInteger.valueOf(5), BigInteger.valueOf(9), clgn2Eau, buyer, deadline)
             .send()
 
-        assertEquals(BigInteger.valueOf(5), helper.clgnToken.balanceOf(market.contractAddress).send())
-        assertEquals(BigInteger.ZERO, helper.eauToken.balanceOf(market.contractAddress).send())
+        assertEquals(
+            oldEauMarketBalance - BigInteger.valueOf(5),
+            helper.clgnToken.balanceOf(market.contractAddress).send()
+        )
+        assertEquals(oldClgnMarketBalance, helper.eauToken.balanceOf(market.contractAddress).send())
         assertEquals(BigInteger.ZERO, helper.clgnToken.balanceOf(buyer).send())
         assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(buyer).send())
     }
@@ -159,14 +164,16 @@ class MarketAdaptorTest {
      */
     @Test
     fun swapExactTokensForTokensEau2ClgnSunnyDay() {
+        val oldEauMarketBalance = helper.eauToken.balanceOf(market.contractAddress).send()
+        val oldClgnMarketBalance = helper.clgnToken.balanceOf(market.contractAddress).send()
         helper.addCLGN(market.contractAddress, BigInteger.valueOf(5))
         helper.addEAU(buyer, BigInteger.TEN)
         buyerAllows(eau, market.contractAddress, BigInteger.TEN)
 
         market.swapExactTokensForTokens(BigInteger.TEN, BigInteger.valueOf(4), eau2Clgn, buyer, deadline).send()
 
-        assertEquals(BigInteger.ZERO, helper.clgnToken.balanceOf(market.contractAddress).send())
-        assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(market.contractAddress).send())
+        assertEquals(oldClgnMarketBalance, helper.clgnToken.balanceOf(market.contractAddress).send())
+        assertEquals(oldClgnMarketBalance + BigInteger.TEN, helper.eauToken.balanceOf(market.contractAddress).send())
         assertEquals(BigInteger.valueOf(5), helper.clgnToken.balanceOf(buyer).send())
         assertEquals(BigInteger.ZERO, helper.eauToken.balanceOf(buyer).send())
     }
@@ -178,6 +185,8 @@ class MarketAdaptorTest {
      */
     @Test
     fun swapTokensForExactTokensClgn2EauSunnyDay() {
+        val oldEauMarketBalance = helper.eauToken.balanceOf(market.contractAddress).send()
+        val oldClgnMarketBalance = helper.clgnToken.balanceOf(market.contractAddress).send()
         helper.addEAU(market.contractAddress, BigInteger.TEN)
         helper.addCLGN(buyer, BigInteger.valueOf(6))
         buyerAllows(clgn, market.contractAddress, BigInteger.valueOf(6))
@@ -186,8 +195,8 @@ class MarketAdaptorTest {
         market.swapTokensForExactTokens(BigInteger.TEN, BigInteger.valueOf(6), clgn2Eau, buyer, deadline)
             .send()
 
-        assertEquals(BigInteger.valueOf(5), helper.clgnToken.balanceOf(market.contractAddress).send())
-        assertEquals(BigInteger.ZERO, helper.eauToken.balanceOf(market.contractAddress).send())
+        assertEquals(oldClgnMarketBalance + BigInteger.valueOf(5), helper.clgnToken.balanceOf(market.contractAddress).send())
+        assertEquals(oldEauMarketBalance, helper.eauToken.balanceOf(market.contractAddress).send())
         assertEquals(BigInteger.ONE, helper.clgnToken.balanceOf(buyer).send())
         assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(buyer).send())
         // now it is responsibility of a buyer to remove allowance on leftover
@@ -201,6 +210,8 @@ class MarketAdaptorTest {
      */
     @Test
     fun swapTokensForExactTokensEau2ClgnSunnyDay() {
+        val oldEauMarketBalance = helper.eauToken.balanceOf(market.contractAddress).send()
+        val oldClgnMarketBalance = helper.clgnToken.balanceOf(market.contractAddress).send()
         helper.addCLGN(market.contractAddress, BigInteger.valueOf(5))
         helper.addEAU(buyer, BigInteger.valueOf(12))
         buyerAllows(eau, market.contractAddress, BigInteger.valueOf(12))
@@ -209,8 +220,8 @@ class MarketAdaptorTest {
         market.swapTokensForExactTokens(BigInteger.valueOf(5), BigInteger.valueOf(12), eau2Clgn, buyer, deadline)
             .send()
 
-        assertEquals(BigInteger.ZERO, helper.clgnToken.balanceOf(market.contractAddress).send())
-        assertEquals(BigInteger.TEN, helper.eauToken.balanceOf(market.contractAddress).send())
+        assertEquals(oldClgnMarketBalance, helper.clgnToken.balanceOf(market.contractAddress).send())
+        assertEquals(oldEauMarketBalance + BigInteger.TEN, helper.eauToken.balanceOf(market.contractAddress).send())
         assertEquals(BigInteger.valueOf(5), helper.clgnToken.balanceOf(buyer).send())
         assertEquals(BigInteger.TWO, helper.eauToken.balanceOf(buyer).send())
         // now it is responsibility of a buyer to remove allowance on leftover

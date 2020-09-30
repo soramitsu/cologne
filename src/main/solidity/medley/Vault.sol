@@ -48,6 +48,9 @@ contract Vault is IVault, Ownable {
 
     uint _limitBreachedTime = 0;
 
+    // Total repaid in fees accrued for fee discount
+    uint _totalFeesRepaid = 0;
+
     ITimeProvider _timeProvider;
 
     // Close-out state - Initial Liquidity Dutch Auction started
@@ -130,7 +133,7 @@ contract Vault is IVault, Ownable {
         if (_closeOutTime != 0) {
             uint penalty = costInEau.div(10);
             if (spender != address(this))
-                require(_eauToken.transferFrom(msg.sender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
+                require(_eauToken.transferFrom(spender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
             require(_eauToken.balanceOf(address(this)) >= penalty, "Vault:buy: Not enough EAU for penalty");
 
             _eauToken.approve(address(_medleyDao.getClgnMarket()), penalty);
@@ -172,11 +175,10 @@ contract Vault is IVault, Ownable {
 
     function _payOff(address spender, uint amount) private {
         if (spender != address(this))
-            require(_eauToken.transferFrom(msg.sender, address(this), amount), "Vault: cannot transfer EAU.");
+            require(_eauToken.transferFrom(spender, address(this), amount), "Vault: cannot transfer EAU.");
         require(_eauToken.balanceOf(address(this)) >= amount, "Vault:payOff: Not enough EAU to pay off");
 
         _recordAccounting(AccountingRecordType.Deposit, amount, _timeProvider.getTime());
-        _debtUpdateTime = _timeProvider.getTime();
 
         uint leftover = _payOffFees(amount);
 
@@ -199,6 +201,8 @@ contract Vault is IVault, Ownable {
         uint price = getPrice();
         if (_price != price)
             _price = price;
+
+        _debtUpdateTime = _timeProvider.getTime();
     }
 
     function close() onlyOwner public override {
@@ -308,6 +312,10 @@ contract Vault is IVault, Ownable {
 
     function getFees() notClosed public view override returns (uint) {
         return _getFees(_timeProvider.getTime());
+    }
+
+    function getTotalFeesRepaid() public view override returns (uint) {
+        return _totalFeesRepaid;
     }
 
     function _getFees(uint time) notClosed private view returns (uint fees) {
@@ -517,6 +525,7 @@ contract Vault is IVault, Ownable {
             _feeAccrued = totalFeesAccrued - leftover;
             leftover = 0;
         }
+        _totalFeesRepaid += feesPaid;
         _distributeFee(feesPaid);
 
         return leftover;
@@ -531,7 +540,7 @@ contract Vault is IVault, Ownable {
         _clgnToken.burn(clgnBought);
 
         // 50% of EAU are distributed
-        _eauToken.distribute(amount - toBuyClgn);
+        _eauToken.distribute(amount.sub(toBuyClgn));
     }
 
     /**

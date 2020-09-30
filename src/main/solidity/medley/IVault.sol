@@ -68,7 +68,13 @@ interface IVault {
 
     function getPrincipal() external view returns (uint);
 
+    /**
+     * Returns fees accrued at this moment
+     */
     function getFees() external view returns (uint);
+
+    /** Returns total fees repaid by owner (used to get liquidity fee discount) */
+    function getTotalFeesRepaid() external view returns (uint);
 
     // Returns User Token price in EAU
     function getPrice() external view returns (uint);
