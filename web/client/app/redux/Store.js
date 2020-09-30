@@ -1,10 +1,10 @@
 import throttle from "lodash/throttle";
-import { applyMiddleware, createStore } from "redux";
+import {applyMiddleware, createStore} from "redux";
 import thunk from "redux-thunk";
 import rootReducer from "./RootReducer";
-import { loadState, saveState } from "../common/SessionStorage";
+import {loadState, saveState} from "../common/SessionStorage";
 // import {engFormatter, rusFormatter} from "../common/Utils";
-import { LANG_RUS } from "./actions/Lang";
+import {LANG_RUS} from "./actions/Lang";
 
 const persistedState = loadState();
 
@@ -36,7 +36,7 @@ store.subscribe(
         // lang: store.getState().lang.lang,
       },
     });
-  }, 1000)
+  }, 1000),
 );
 
 export default store;

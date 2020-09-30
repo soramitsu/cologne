@@ -1,23 +1,19 @@
 import React from "react";
 import {connect} from "react-redux";
-import {Button, Container, Form, Header, Table} from "semantic-ui-react";
+import {Container, Grid, GridRow, Header, Table} from "semantic-ui-react";
+import ethers from "ethers";
 import {
   cologneDaoContract,
-  userTokenContract,
-  cologneDaoAddress,
-  multiplier,
-  clgnTokenAbi,
+  vaultAbi,
+  signer,
+  stateFormatter,
 } from "../common/Resources";
+import CreateVault from "./CreateVault";
+import VaultsActions from "./VaultsActions";
 
 class VaultsList extends React.Component {
   state = {
     items: [],
-    tokenAddress: "",
-    vaultValue: "",
-    tokenAmount: "",
-    stakingAmount: "",
-    isCreating: false,
-    isStaking: false,
   };
 
   componentDidMount() {
@@ -33,193 +29,116 @@ class VaultsList extends React.Component {
 
   startPolling() {
     const self = this;
-    setTimeout(() => {
-      self.poll();
-      self.timer = setInterval(self.poll.bind(self), 1000);
+    setTimeout(async () => {
+      await self.poll();
+      self.timer = setInterval(self.poll, 1000);
     }, 1000);
   }
 
-  poll() {
-    cologneDaoContract.listVaults.call((error, result) => {
-      if (!error) {
-        // console.log(result);
-        this.setState({
-          items: result,
-        });
-      } else {
-        console.log(error.code);
-      }
+  poll = async () => {
+    const vaults = await cologneDaoContract.listVaults();
+
+    const enrichedVaults = await Promise.all(
+      vaults.map(async (vault) => {
+        const vaultContract = new ethers.Contract(vault, vaultAbi, signer);
+
+        const price = ethers.utils.formatEther(await vaultContract.getPrice());
+
+        const collateral = ethers.utils.formatEther(
+          await vaultContract.getCollateralInEau(),
+        );
+
+        const totalDebt = ethers.utils.formatEther(
+          await vaultContract.getTotalDebt(),
+        );
+
+        const tokenAmount = ethers.utils.formatEther(
+          await vaultContract.getTokenAmount(),
+        );
+
+        const vaultState = await vaultContract.getState();
+
+        const creditLimit = ethers.utils.formatEther(
+          await vaultContract.canBorrow(),
+        );
+
+        const isOwner = await vaultContract.isOwner();
+
+        return {
+          vaultContract,
+          isOwner,
+          address: vault,
+          price,
+          collateral,
+          totalDebt,
+          tokenAmount,
+          creditLimit,
+          vaultState,
+        };
+      }),
+    );
+
+    this.setState({
+      items: enrichedVaults,
     });
-  }
-
-  handleChange = (e, {name, value}) => {
-    this.setState({[name]: value});
-  };
-
-  handleStakingChange = (e) => {
-    this.setState((prevState) => ({
-      isStaking: !prevState.isStaking,
-    }));
-  };
-
-  handleSubmit = () => {
-    const {
-      tokenAddress,
-      vaultValue,
-      isStaking,
-      stakingAmount,
-      tokenAmount,
-    } = this.state;
-
-    // approve tx should be sent first for user token contract
-    userTokenContract.approve.sendTransaction(
-      cologneDaoAddress,
-      tokenAmount * multiplier,
-      (error, result) => {
-        if (!error) {
-          console.log(result);
-        } else {
-          console.log(error.code);
-        }
-      },
-    );
-
-    const toStake = isStaking ? stakingAmount * multiplier : 0;
-
-    // approve tx should be sent first for clgn token contract
-    if (isStaking) {
-      cologneDaoContract.getMdlyTokenAddress.call((error, result) => {
-        if (!error) {
-          const clgnTokenAddress = result;
-          const clgnTokenContract = clgnTokenAbi.at(clgnTokenAddress);
-
-          clgnTokenContract.approve.sendTransaction(
-            cologneDaoAddress,
-            toStake * multiplier,
-            (error, result) => {
-              if (!error) {
-                console.log(result);
-              } else {
-                console.log(error.code);
-              }
-            },
-          );
-        } else {
-          console.log(error.code);
-        }
-      });
-    }
-
-    cologneDaoContract.createVault.sendTransaction(
-      tokenAddress,
-      toStake,
-      tokenAmount * multiplier,
-      vaultValue * multiplier,
-      (error, result) => {
-        if (!error) {
-          console.log(result);
-        } else {
-          console.log(error.code);
-        }
-      },
-    );
   };
 
   render() {
-    const {
-      isCreating,
-      vaultValue,
-      tokenAddress,
-      tokenAmount,
-      items,
-      isStaking,
-      stakingAmount,
-    } = this.state;
+    const {items} = this.state;
 
     return (
       <Container>
-        <Header as="h4">Deployed Vaults</Header>
-        <Button
-          color="green"
-          onClick={() => {
-            this.setState((prevState) => ({
-              isCreating: !prevState.isCreating,
-            }));
-          }}
-        >
-          {!isCreating && "Create new Vault"}
-          {isCreating && "Hide form"}
-        </Button>
+        <Grid.Row>
+          <Grid.Column>
+            <CreateVault />
+          </Grid.Column>
+        </Grid.Row>
 
-        {isCreating && (
-          <Form style={{marginTop: "1em"}} onSubmit={this.handleSubmit}>
-            <Form.Field>
-              <label>Token address</label>
-              <Form.Input
-                placeholder="0x7d73424a8256c0b2ba245e5d5a3de8820e45f390"
-                name="tokenAddress"
-                value={tokenAddress}
-                onChange={this.handleChange}
-              />
-            </Form.Field>
-
-            <Form.Field>
-              <label>Token amount</label>
-              <Form.Input
-                placeholder="100"
-                name="tokenAmount"
-                value={tokenAmount}
-                onChange={this.handleChange}
-              />
-            </Form.Field>
-
-            <Form.Field>
-              <label>Vault value (in EAU)</label>
-              <Form.Input
-                placeholder="10"
-                name="vaultValue"
-                value={vaultValue}
-                onChange={this.handleChange}
-              />
-            </Form.Field>
-
-            <Form.Checkbox
-              label="Staking enabled"
-              name="isStaking"
-              checked={isStaking}
-              onChange={this.handleStakingChange}
-            />
-
-            {isStaking && (
-              <Form.Field>
-                <label>Staking amount (in CLGN)</label>
-                <Form.Input
-                  placeholder="10"
-                  name="stakingAmount"
-                  value={stakingAmount}
-                  onChange={this.handleChange}
-                />
-              </Form.Field>
-            )}
-
-            <Button type="submit">Create</Button>
-          </Form>
-        )}
+        <Header as="h3">Deployed Vaults</Header>
 
         <Table basic="very" celled collapsing>
           <Table.Header style={{marginTop: "1em"}}>
             <Table.Row>
               <Table.HeaderCell>Address</Table.HeaderCell>
-              {/* <Table.HeaderCell>Balance</Table.HeaderCell> */}
+              <Table.HeaderCell>Price in EAU</Table.HeaderCell>
+              <Table.HeaderCell>Collateral in EAU</Table.HeaderCell>
+              <Table.HeaderCell>Total debt in EAU</Table.HeaderCell>
+              <Table.HeaderCell>Token amount</Table.HeaderCell>
+              <Table.HeaderCell>Credit limit</Table.HeaderCell>
+              <Table.HeaderCell>Vault state</Table.HeaderCell>
+              <Table.HeaderCell>Owned by you</Table.HeaderCell>
+              <Table.HeaderCell>Actions</Table.HeaderCell>
             </Table.Row>
           </Table.Header>
 
           <Table.Body>
             {items.map((item) => (
-              <Table.Row key={item}>
+              <Table.Row key={item.address}>
                 <Table.Cell>
-                  <Header as="h4">{item}</Header>
+                  <Header as="h4">{item.address}</Header>
                 </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.price}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.collateral}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.totalDebt}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.tokenAmount}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.creditLimit}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{stateFormatter(item.vaultState)}</Header>
+                </Table.Cell>
+                <Table.Cell>
+                  <Header as="h4">{item.isOwner ? "Yes" : "No"}</Header>
+                </Table.Cell>
+                <VaultsActions item={item} />
               </Table.Row>
             ))}
           </Table.Body>

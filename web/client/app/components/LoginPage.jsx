@@ -1,65 +1,37 @@
 import React from "react";
-import {connect} from "react-redux";
+import {useDispatch} from "react-redux";
+
 import {Button, Container, Header} from "semantic-ui-react";
 import MetaMaskOnboarding from "@metamask/onboarding";
 import {loginUser} from "../redux/actions/User";
 
-const LoginPage = class extends React.Component {
-  render() {
-    return (
-      <Container>
-        {typeof window.ethereum !== "undefined" && (
-          <Container textAlign="center" style={{marginTop: "7em"}}>
-            <Header as="h1">Please connect your Metamask wallet</Header>
-            <Button
-              size="massive"
-              color="orange"
-              content="Connect"
-              onClick={async () => {
-                const accounts = await ethereum.request({
-                  method: "eth_requestAccounts",
-                });
-                if (accounts.length > 0) {
-                  this.props.loginUser({
-                    account: accounts[0],
-                  });
-                } else {
-                  // TODO: proper error handling
-                }
-              }}
-            />
-          </Container>
-        )}
-        {typeof window.ethereum === "undefined" && (
-          <Header as="h1">
-            For the system to work, you will need to install{" "}
-            <a href="https://metamask.io/">Metamask</a>
-          </Header>
-        )}
-      </Container>
-    );
-  }
-};
-
-const ONBOARD_TEXT = "Click here to install MetaMask!";
-const CONNECT_TEXT = "Connect";
-const CONNECTED_TEXT = "Connected";
+function LoginPage() {
+  return (
+    <Container>
+      <OnboardingButton />
+    </Container>
+  );
+}
 
 export function OnboardingButton() {
-  const [buttonText, setButtonText] = React.useState(ONBOARD_TEXT);
-  const [isDisabled, setDisabled] = React.useState(false);
   const [accounts, setAccounts] = React.useState([]);
+  const [isVisible, setVisibility] = React.useState(false);
   const onboarding = React.useRef();
+  const dispatch = useDispatch();
+
+  React.useEffect(() => {
+    if (!onboarding.current) {
+      onboarding.current = new MetaMaskOnboarding();
+    }
+  }, []);
 
   React.useEffect(() => {
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
       if (accounts.length > 0) {
-        setButtonText(CONNECTED_TEXT);
-        setDisabled(true);
+        setVisibility(false);
         onboarding.current.stopOnboarding();
       } else {
-        setButtonText(CONNECT_TEXT);
-        setDisabled(false);
+        setVisibility(true);
       }
     }
   }, [accounts]);
@@ -67,6 +39,11 @@ export function OnboardingButton() {
   React.useEffect(() => {
     function handleNewAccounts(newAccounts) {
       setAccounts(newAccounts);
+      dispatch(
+        loginUser({
+          account: newAccounts[0],
+        }),
+      );
     }
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
       window.ethereum
@@ -91,20 +68,21 @@ export function OnboardingButton() {
   };
 
   return (
-    <button disabled={isDisabled} onClick={onClick}>
-      {buttonText}
-    </button>
+    <Container>
+      {isVisible && (
+        <Container textAlign="center" style={{marginTop: "7em"}}>
+          <Header as="h1">Please connect your Metamask wallet</Header>
+          <Button
+            size="massive"
+            color="orange"
+            content="Connect"
+            onClick={onClick}
+          />
+        </Container>
+      )}
+      {!isVisible && <Header as="h1">Wallet is already connected</Header>}
+    </Container>
   );
 }
 
-const mapDispatchToProps = (dispatch) => ({
-  loginUser(user) {
-    dispatch(loginUser(user));
-  },
-});
-
-const mapStateToProps = (state) => ({
-  user: state.user,
-});
-
-export default connect(mapStateToProps, mapDispatchToProps)(LoginPage);
+export default LoginPage;

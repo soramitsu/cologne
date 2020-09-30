@@ -1,5 +1,6 @@
 /* eslint-disable react/no-children-prop */
 import "semantic-ui-css/semantic.min.css";
+import {ethers} from "ethers";
 
 import React from "react";
 import {render} from "react-dom";
