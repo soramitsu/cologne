@@ -76,19 +76,14 @@ class ServiceActions extends React.Component {
           Number.parseInt(time.toString()) + 86400,
         );
         break;
-      case "bd":
+      case "f3d":
         await timeProviderContract.setTime(
-          Number.parseInt(time.toString()) - 86400,
+          Number.parseInt(time.toString()) + 86400 * 3,
         );
         break;
       case "fh":
         await timeProviderContract.setTime(
-          Number.parseInt(time.toString()) + 3600,
-        );
-        break;
-      case "bh":
-        await timeProviderContract.setTime(
-          Number.parseInt(time.toString()) - 3600,
+          Number.parseInt(time.toString()) + 1800,
         );
         break;
       default:
@@ -134,6 +129,16 @@ class ServiceActions extends React.Component {
             style={{marginTop: "1em"}}
             color="teal"
             onClick={() => {
+              this.timeTravel("fh");
+            }}
+          >
+            Forward 30 minutes
+          </Button>
+
+          <Button
+            style={{marginTop: "1em"}}
+            color="teal"
+            onClick={() => {
               this.timeTravel("fd");
             }}
           >
@@ -144,30 +149,10 @@ class ServiceActions extends React.Component {
             style={{marginTop: "1em"}}
             color="teal"
             onClick={() => {
-              this.timeTravel("bd");
+              this.timeTravel("f3d");
             }}
           >
-            Back 1 Day
-          </Button>
-
-          <Button
-            style={{marginTop: "1em"}}
-            color="teal"
-            onClick={() => {
-              this.timeTravel("fh");
-            }}
-          >
-            Forward 1 hour
-          </Button>
-
-          <Button
-            style={{marginTop: "1em"}}
-            color="teal"
-            onClick={() => {
-              this.timeTravel("bh");
-            }}
-          >
-            Back 1 hour
+            Forward 3 Days
           </Button>
         </Container>
       </Container>

@@ -48,13 +48,9 @@ class VaultsList extends React.Component {
           await vaultContract.getCollateralInEau(),
         );
 
-        try {
-          await vaultContract.getTotalDebt().catch((err) => {
-            console.log(err);
-          });
-        } catch (err) {
-          console.log(err);
-        }
+        const totalDebt = ethers.utils.formatEther(
+          await vaultContract.getTotalDebt(),
+        );
 
         const tokenAmount = ethers.utils.formatEther(
           await vaultContract.getTokenAmount(),
@@ -153,7 +149,6 @@ class VaultsList extends React.Component {
 }
 
 const mapStateToProps = (state) => ({
-  lang: state.lang.dict,
   user: state.user,
 });
 

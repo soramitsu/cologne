@@ -158,17 +158,6 @@ export const clgnTokenAbi = [
 
 export const cologneDaoAbi = [
   {
-    inputs: [
-      {internalType: "address", name: "clgnToken", type: "address"},
-      {internalType: "address", name: "eauToken", type: "address"},
-      {internalType: "address", name: "clgnPriceOracle", type: "address"},
-      {internalType: "address", name: "clgnMarket", type: "address"},
-      {internalType: "address", name: "timeProvider", type: "address"},
-    ],
-    stateMutability: "nonpayable",
-    type: "constructor",
-  },
-  {
     anonymous: false,
     inputs: [
       {indexed: true, internalType: "address", name: "vault", type: "address"},
@@ -688,12 +677,12 @@ export const timeProviderAbi = [
 export const VaultStates = [
   "Trading",
   "Defaulted",
-  "InitialLiquidityAuctionInProcess",
-  "WaitingForSlashing",
-  "WaitingForClgnAuction",
+  "Initial Liquidity Auction In Progress",
+  "Waiting For Slashing",
+  "Waiting For Clgn Auction",
   "Slashed",
   "Closed",
-  "SoldOut",
+  "Sold Out",
 ];
 
 export const stateFormatter = (state) => VaultStates[state];
