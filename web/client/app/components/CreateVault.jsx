@@ -1,6 +1,6 @@
 import ethers from "ethers";
 import React from "react";
-import {Button, Container, Form} from "semantic-ui-react";
+import {Button, Container, Form, Message} from "semantic-ui-react";
 import {
   cologneDaoAddress,
   cologneDaoContract,
@@ -12,9 +12,8 @@ export default class CreateVault extends React.Component {
     tokenAddress: "",
     vaultValue: "",
     tokenAmount: "",
-    stakingAmount: "",
     isCreating: false,
-    isStaking: false,
+    error: false,
   };
 
   handleChange = (e, {name, value}) => {
@@ -22,11 +21,11 @@ export default class CreateVault extends React.Component {
   };
 
   handleSubmit = async () => {
-    const {
-      tokenAddress,
-      vaultValue,
-      tokenAmount,
-    } = this.state;
+    const {tokenAddress, vaultValue, tokenAmount} = this.state;
+
+    this.setState({
+      error: false,
+    });
 
     // approve tx should be sent first for user token contract
     await userTokenContract.approve(
@@ -35,11 +34,21 @@ export default class CreateVault extends React.Component {
     );
 
     // create vault itself
-    await cologneDaoContract.createVault(
-      tokenAddress,
-      ethers.utils.parseEther(tokenAmount),
-      ethers.utils.parseEther(vaultValue),
-    );
+    const res = await cologneDaoContract
+      .createVault(
+        tokenAddress,
+        ethers.utils.parseEther(tokenAmount),
+        ethers.utils.parseEther(vaultValue),
+      )
+      .catch((error) => {
+        this.setState({error});
+      });
+
+    if (res) {
+      this.setState({
+        error: false,
+      });
+    }
   };
 
   render() {
@@ -48,8 +57,7 @@ export default class CreateVault extends React.Component {
       vaultValue,
       tokenAddress,
       tokenAmount,
-      isStaking,
-      stakingAmount,
+      error,
     } = this.state;
 
     return (
@@ -66,7 +74,7 @@ export default class CreateVault extends React.Component {
           {isCreating && "Hide form"}
         </Button>
         {isCreating && (
-          <Form style={{marginTop: "1em"}} onSubmit={this.handleSubmit}>
+          <Form style={{marginTop: "1em"}} onSubmit={this.handleSubmit} error>
             <Form.Field>
               <label>Token address</label>
               <Form.Input
@@ -97,16 +105,15 @@ export default class CreateVault extends React.Component {
               />
             </Form.Field>
 
-            {isStaking && (
-              <Form.Field>
-                <label>Staking amount (in CLGN)</label>
-                <Form.Input
-                  placeholder="10"
-                  name="stakingAmount"
-                  value={stakingAmount}
-                  onChange={this.handleChange}
-                />
-              </Form.Field>
+            {error && (
+              <Message
+                error
+                header="Something went wrong"
+                content={
+                  (error.data && error.data.message) ||
+                  (error.message && error.message)
+                }
+              />
             )}
 
             <Button type="submit">Create</Button>
