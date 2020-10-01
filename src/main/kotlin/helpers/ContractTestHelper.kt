@@ -28,7 +28,7 @@ class ContractTestHelper(host: String, port: Int) {
             HttpUrl.Builder().scheme("http").host(host).port(port).build().toString()
         )
     )
-    val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(5_000_000))
+    val gasProvider = StaticGasProvider(BigInteger.valueOf(150_000_000_000), BigInteger.valueOf(6_000_000))
 
     // Ethereum wallets
     val credentialsSeed = Credentials.create("0x1111111111111111111111111111111111111111111111111111111111111111")
@@ -84,12 +84,12 @@ class ContractTestHelper(host: String, port: Int) {
         ).send()
         clgnToken.transferOwnership(medleyDAO.contractAddress).send()
         // some EAU for tests
-        eauToken.mint(credentialsSeed.address, BigInteger.valueOf(100_000_000_000)).send()
+        eauToken.mint(credentialsSeed.address, toTokenAmount(100_000_000)).send()
         eauToken.transferOwnership(medleyDAO.contractAddress).send()
 
         // add liquidity to market
-        eauToken.transfer(marketAdaptor.contractAddress, BigInteger.valueOf(100_000_000)).send()
-        clgnToken.transfer(marketAdaptor.contractAddress, BigInteger.valueOf(100_000_000)).send()
+        eauToken.transfer(marketAdaptor.contractAddress, toTokenAmount(100_000)).send()
+        clgnToken.transfer(marketAdaptor.contractAddress, toTokenAmount(100_000)).send()
     }
 
     fun addCLGN(address: String, amount: BigInteger) {
@@ -161,5 +161,11 @@ class ContractTestHelper(host: String, port: Int) {
         val eaus = eauToken.balanceOf(account).send()
         val clgns = clgnToken.balanceOf(account).send()
         return Triple(tkns, eaus, clgns);
+    }
+
+    companion object {
+        fun toTokenAmount(amount: Long): BigInteger {
+            return BigInteger.valueOf(amount).multiply(BigInteger.TEN.pow(18));
+        }
     }
 }

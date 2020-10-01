@@ -1,86 +1,22 @@
 package acceptance
 
-import contract.EAUToken
-import contract.CLGNToken
 import contract.Vault
-import helpers.ContractTestHelper
 import helpers.VaultState
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.testcontainers.containers.GenericContainer
-import org.testcontainers.images.builder.ImageFromDockerfile
-import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import org.web3j.crypto.Credentials
 import org.web3j.protocol.exceptions.TransactionException
 import java.math.BigInteger
-import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
 
 @Testcontainers
-class ClgnAuctionAcceptanceTest {
-
-    @Container
-    private val ganache: GenericContainer<Nothing> =
-        GenericContainer<Nothing>(
-            ImageFromDockerfile()
-                .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
-        )
-            .withExposedPorts(8545)
-
-    val initialAmount = BigInteger.valueOf(4000)
-    val tokenPrice = BigInteger.ONE
-    lateinit var helper: ContractTestHelper
-    lateinit var owner: Credentials
-    lateinit var auctionInitiator: Credentials
-    lateinit var slashingInitiator: Credentials
-    lateinit var coverInitiator: Credentials
-    lateinit var eauToken: EAUToken
-    lateinit var clgnToken: CLGNToken
-    lateinit var ownerVault: Vault
-    lateinit var auctionIntiatorVault: Vault
-    lateinit var slashingInitiatorVault: Vault
-    lateinit var coverInitiatorVault: Vault
-
-    @BeforeEach
-    fun setUp() {
-        helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
-        owner = helper.credentialsAlice
-        auctionInitiator = helper.credentialsBob
-        slashingInitiator = helper.credentialsCharlie
-        coverInitiator = helper.credentialsDave
-        eauToken = helper.eauToken
-        clgnToken = helper.clgnToken
-    }
-
-    /**
-     * Deploy vault with Owner credentials
-     */
-    fun ownerCreatesVault(
-        amount: BigInteger = initialAmount,
-        price: BigInteger = tokenPrice
-    ) {
-        val vaultAddress = helper.createVault(owner, amount, price)
-        ownerVault = helper.vaultByOwner
-        auctionIntiatorVault = Vault.load(vaultAddress, helper.web3, auctionInitiator, helper.gasProvider)
-        slashingInitiatorVault = Vault.load(vaultAddress, helper.web3, slashingInitiator, helper.gasProvider)
-        coverInitiatorVault = Vault.load(vaultAddress, helper.web3, coverInitiator, helper.gasProvider)
-    }
-
-    /**
-     * Breach credit limit
-     */
-    fun breachVault() {
-        helper.breachVault()
-    }
+class ClgnAuctionAccept : AcceptanceTest() {
 
     fun failInitialAuction() {
-        auctionIntiatorVault.startInitialLiquidityAuction().send()
+        vaultByInitiator.startInitialLiquidityAuction().send()
         // Dutch auction has passed
         val time = helper.timeProvider.time.send().add(BigInteger.valueOf(180000))
         helper.timeProvider.setTime(time).send()
-
     }
 
     /**
@@ -91,7 +27,8 @@ class ClgnAuctionAcceptanceTest {
     @Test
     fun coverShortfallClose() {
         ownerCreatesVault()
-        ownerVault.close().send()
+        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        vaultByOwner.close().send()
 
         assertThrows<TransactionException> {
             coverInitiatorVault.coverShortfall().send()
@@ -106,8 +43,9 @@ class ClgnAuctionAcceptanceTest {
     @Test
     fun coverShortfallAuction() {
         ownerCreatesVault()
-        breachVault()
-        auctionIntiatorVault.startInitialLiquidityAuction().send()
+        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
 
         assertThrows<TransactionException> {
             coverInitiatorVault.coverShortfall().send()
@@ -122,7 +60,8 @@ class ClgnAuctionAcceptanceTest {
     @Test
     fun coverShortfallNotSlashed() {
         ownerCreatesVault()
-        breachVault()
+        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        ownerBreachesVault()
         failInitialAuction()
 
         assertThrows<TransactionException> {
@@ -139,7 +78,8 @@ class ClgnAuctionAcceptanceTest {
     @Test
     fun coverShortfallWrongInitiator() {
         ownerCreatesVault()
-        breachVault()
+        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        ownerBreachesVault()
         failInitialAuction()
 
         assertThrows<TransactionException> {
@@ -155,24 +95,26 @@ class ClgnAuctionAcceptanceTest {
      */
     @Test
     fun coverShortfall() {
-        helper.addEAU(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1100))
-        helper.addCLGN(coverInitiator.address, BigInteger.valueOf(25))
+        val coverInitiator = helper.credentialsDave
+        helper.addEAU(helper.marketAdaptor.contractAddress, toTokenAmount(1100))
+        helper.addCLGN(coverInitiator.address, toTokenAmount(25))
         ownerCreatesVault()
-        breachVault()
+        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, coverInitiator, helper.gasProvider)
+        ownerBreachesVault()
         failInitialAuction()
-        assertEquals(BigInteger.ZERO, ownerVault.fees.send())
-        assertEquals(BigInteger.valueOf(1000), ownerVault.principal.send())
+        assertEquals(BigInteger.ZERO, vaultByOwner.fees.send())
+        assertEquals(toTokenAmount(1000), vaultByOwner.principal.send())
         val initialClgnSupply = clgnToken.totalSupply().send()
-        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), ownerVault.state.send())
-        slashingInitiatorVault.slash().send()
-        assertEquals(VaultState.WaitingForClgnAuction.toBigInteger(), ownerVault.state.send())
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), vaultByOwner.state.send())
+        vaultBySlasher.slash().send()
+        assertEquals(VaultState.WaitingForClgnAuction.toBigInteger(), vaultByOwner.state.send())
 
         coverInitiatorVault.coverShortfall().send()
 
-        assertEquals(VaultState.Slashed.toBigInteger(), ownerVault.state.send())
-        assertEquals(BigInteger.valueOf(550), clgnToken.totalSupply().send().subtract(initialClgnSupply))
-        assertEquals(BigInteger.ZERO, ownerVault.getTotalDebt().send())
-        assertEquals(BigInteger.valueOf(100), eauToken.balanceOf(coverInitiator.address).send())
-        assertEquals(VaultState.Slashed.toBigInteger(), ownerVault.state.send())
+        assertEquals(VaultState.Slashed.toBigInteger(), vaultByOwner.state.send())
+        assertEquals(toTokenAmount(550), clgnToken.totalSupply().send().subtract(initialClgnSupply))
+        assertEquals(BigInteger.ZERO, vaultByOwner.getTotalDebt().send())
+        assertEquals(toTokenAmount(100), eauToken.balanceOf(coverInitiator.address).send())
+        assertEquals(VaultState.Slashed.toBigInteger(), vaultByOwner.state.send())
     }
 }

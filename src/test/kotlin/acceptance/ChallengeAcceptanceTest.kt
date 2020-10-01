@@ -1,62 +1,17 @@
 package acceptance
 
 import contract.Vault
-import helpers.ContractTestHelper
 import helpers.VaultState
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.testcontainers.containers.GenericContainer
-import org.testcontainers.images.builder.ImageFromDockerfile
-import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.exceptions.TransactionException
 import java.math.BigInteger
-import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
 
 @Testcontainers
-class ChallengeAcceptanceTest {
-    @Container
-    private val ganache: GenericContainer<Nothing> =
-        GenericContainer<Nothing>(
-            ImageFromDockerfile()
-                .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
-        )
-            .withExposedPorts(8545)
-
-    lateinit var helper: ContractTestHelper
-    val initialAmount = BigInteger.valueOf(100)
-    val tokenPrice = BigInteger.TEN
-    lateinit var owner: Credentials
-    lateinit var auctionInitiator: Credentials
-    lateinit var challenger: Credentials
-    lateinit var challenger2: Credentials
-    lateinit var vaultByOwner: Vault
-    lateinit var vaultByInitiator: Vault
-    lateinit var vaultByChallenger: Vault
-    lateinit var vaultByChallenger2: Vault
-
-    @BeforeEach
-    fun setUp() {
-        helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
-    }
-
-    /**
-     * Deploy vault with Owner credentials
-     */
-    fun ownerCreatesVault() {
-        val vaultAddress = helper.createVault(helper.credentialsAlice, initialAmount, tokenPrice)
-        vaultByOwner = helper.vaultByOwner
-        owner = helper.credentialsAlice
-        auctionInitiator = helper.credentialsBob
-        challenger = helper.credentialsCharlie
-        challenger2 = helper.credentialsDave
-        vaultByInitiator = Vault.load(vaultAddress, helper.web3, auctionInitiator, helper.gasProvider)
-        vaultByChallenger = Vault.load(vaultAddress, helper.web3, challenger, helper.gasProvider)
-        vaultByChallenger2 = Vault.load(vaultAddress, helper.web3, challenger2, helper.gasProvider)
-    }
+class ChallengeAcceptanceTest : AcceptanceTest() {
 
     fun startInitialAuction() {
         assertEquals(VaultState.Trading.toBigInteger(), vaultByOwner.state.send())
@@ -95,7 +50,7 @@ class ChallengeAcceptanceTest {
     fun getDefaultChallengeWinner() {
         ownerCreatesVault()
 
-        val (address, price) = vaultByChallenger.challengeWinner.send()
+        val (address, price) = vaultByOwner.challengeWinner.send()
 
         assertEquals("0x0000000000000000000000000000000000000000", address)
         assertEquals(BigInteger.ZERO, price)
@@ -109,6 +64,7 @@ class ChallengeAcceptanceTest {
     @Test
     fun initialLiquidityAuctionIsOver() {
         ownerCreatesVault()
+        val challenger = helper.credentialsCharlie
         startInitialAuction()
         failInitialAuction()
         assertEquals(VaultState.WaitingForSlashing.toBigInteger(), vaultByOwner.state.send())
@@ -125,8 +81,13 @@ class ChallengeAcceptanceTest {
      */
     @Test
     fun eauLockedNotEnough() {
-        ownerCreatesVault()
-        val eauToLock = BigInteger.TEN
+        val initialAmount = toTokenAmount(100)
+        val tokenPrice = toTokenAmount(10)
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val challenger = helper.credentialsCharlie
+        val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)
+
+        val eauToLock = toTokenAmount(10)
 
         assertThrows<TransactionException> {
             vaultByChallenger.challenge(BigInteger.ONE, eauToLock).send()
@@ -140,8 +101,14 @@ class ChallengeAcceptanceTest {
      */
     @Test
     fun priceTooHogh() {
-        ownerCreatesVault()
-        val eauToLock = BigInteger.valueOf(10_000)
+        val initialAmount = toTokenAmount(100)
+        val tokenPrice = toTokenAmount(10)
+        ownerCreatesVault(initialAmount, tokenPrice)
+
+        val challenger = helper.credentialsCharlie
+        val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)
+
+        val eauToLock = toTokenAmount(10_000)
 
         assertThrows<TransactionException> {
             vaultByChallenger.challenge(tokenPrice, eauToLock).send()
@@ -156,17 +123,25 @@ class ChallengeAcceptanceTest {
      */
     @Test
     fun overbidPrice() {
-        ownerCreatesVault()
-        val bidPrice = BigInteger.valueOf(5)
-        var eauLocked = vaultByOwner.tokenAmount.send() * bidPrice
+        val initialAmount = toTokenAmount(100)
+        val tokenPrice = toTokenAmount(10)
+        ownerCreatesVault(initialAmount, tokenPrice)
+
+        val challenger = helper.credentialsCharlie
+        val challenger2 = helper.credentialsDave
+        val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)
+        val vaultByChallenger2 = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger2, helper.gasProvider)
+
+        val bidPrice = toTokenAmount(5)
+        var eauLocked = getEauToBuyUserTokenAmount(vaultByOwner.tokenAmount.send(), tokenPrice = bidPrice)
         challenge(challenger, bidPrice, eauLocked)
         val (address, price) = vaultByChallenger.challengeWinner.send()
         assertEquals(challenger.address, address)
         assertEquals(bidPrice, price)
         assertEquals(eauLocked, vaultByChallenger.getChallengeLocked(challenger.address).send())
 
-        val overbidPrice = BigInteger.valueOf(7)
-        eauLocked = vaultByOwner.tokenAmount.send() * overbidPrice
+        val overbidPrice = toTokenAmount(7)
+        eauLocked = getEauToBuyUserTokenAmount(vaultByOwner.tokenAmount.send(), tokenPrice = overbidPrice)
         challenge(challenger2, overbidPrice, eauLocked)
         val (address2, price2) = vaultByChallenger.challengeWinner.send()
         assertEquals(challenger2.address, address2)
@@ -183,18 +158,23 @@ class ChallengeAcceptanceTest {
      */
     @Test
     fun getRedeemUnlocked() {
-        ownerCreatesVault()
-        val bidPrice = BigInteger.valueOf(5)
-        val eauToLock = BigInteger.valueOf(2_000)
+        val initialAmount = toTokenAmount(100)
+        val tokenPrice = toTokenAmount(10)
+        ownerCreatesVault(initialAmount, tokenPrice)
+        val challenger = helper.credentialsCharlie
+        val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)
+
+        val bidPrice = toTokenAmount(5)
+        val eauToLock = toTokenAmount(2_000)
         challenge(challenger, bidPrice, eauToLock)
         var redeemable = vaultByChallenger.getRedeemableChallenge(challenger.address).send()
-        assertEquals(BigInteger.valueOf(1500), redeemable.component1())
+        assertEquals(toTokenAmount(1500), redeemable.component1())
         assertEquals(BigInteger.ZERO, redeemable.component2())
         val balanceBefore = helper.eauToken.balanceOf(challenger.address).send()
 
         vaultByChallenger.redeemChallenge().send()
 
-        assertEquals(balanceBefore + BigInteger.valueOf(1500), helper.eauToken.balanceOf(challenger.address).send())
+        assertEquals(balanceBefore + toTokenAmount(1500), helper.eauToken.balanceOf(challenger.address).send())
         redeemable = vaultByChallenger.getRedeemableChallenge(challenger.address).send()
         assertEquals(BigInteger.ZERO, redeemable.component1())
         assertEquals(BigInteger.ZERO, redeemable.component2())
@@ -210,20 +190,26 @@ class ChallengeAcceptanceTest {
      */
     @Test
     fun challengeBuyTokens() {
-        ownerCreatesVault()
-        val bidPrice = BigInteger.valueOf(5)
-        val eauToLock = BigInteger.valueOf(2_000)
+        val initialAmount = toTokenAmount(100)
+        val tokenPrice = toTokenAmount(10)
+        ownerCreatesVault(initialAmount, tokenPrice)
+
+        val challenger = helper.credentialsDave
+        val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)
+
+        val bidPrice = toTokenAmount(5)
+        val eauToLock = toTokenAmount(2_000)
         challenge(challenger, bidPrice, eauToLock)
         var redeemable = vaultByChallenger.getRedeemableChallenge(challenger.address).send()
-        assertEquals(BigInteger.valueOf(1500), redeemable.component1())
+        assertEquals(toTokenAmount(1500), redeemable.component1())
         assertEquals(BigInteger.ZERO, redeemable.component2())
         val eauBalanceBefore = helper.eauToken.balanceOf(challenger.address).send()
         val tknBalanceBefore = helper.userToken.balanceOf(challenger.address).send()
 
-        helper.addAndApproveEAU(auctionInitiator, vaultByInitiator.contractAddress, BigInteger.valueOf(100))
-        vaultByInitiator.buy(BigInteger.TEN, tokenPrice, auctionInitiator.address).send()
+        helper.addAndApproveEAU(buyer, vaultByBuyer.contractAddress, toTokenAmount(100))
+        vaultByBuyer.buy(toTokenAmount(10), tokenPrice, buyer.address).send()
         redeemable = vaultByChallenger.getRedeemableChallenge(challenger.address).send()
-        assertEquals(BigInteger.valueOf(1550), redeemable.component1())
+        assertEquals(toTokenAmount(1550), redeemable.component1())
         assertEquals(BigInteger.ZERO, redeemable.component2())
 
         startInitialAuction()
@@ -231,21 +217,20 @@ class ChallengeAcceptanceTest {
         assertEquals(VaultState.SoldOut.toBigInteger(), vaultByOwner.state.send())
 
         redeemable = vaultByChallenger.getRedeemableChallenge(challenger.address).send()
-        assertEquals(BigInteger.valueOf(1550), redeemable.component1())
-        assertEquals(BigInteger.valueOf(90), redeemable.component2())
+        assertEquals(toTokenAmount(1550), redeemable.component1())
+        assertEquals(toTokenAmount(90), redeemable.component2())
 
-
-        helper.addCLGN(helper.marketAdaptor.contractAddress, BigInteger.valueOf(1000))
+        helper.addCLGN(helper.marketAdaptor.contractAddress, toTokenAmount(1000))
 
         vaultByChallenger.redeemChallenge().send()
 
-        assertEquals(eauBalanceBefore + BigInteger.valueOf(1550), helper.eauToken.balanceOf(challenger.address).send())
-        assertEquals(tknBalanceBefore + BigInteger.valueOf(90), helper.userToken.balanceOf(challenger.address).send())
+        assertEquals( eauBalanceBefore + toTokenAmount(1550), helper.eauToken.balanceOf(challenger.address).send())
+        assertEquals(tknBalanceBefore + toTokenAmount(90), helper.userToken.balanceOf(challenger.address).send())
         redeemable = vaultByChallenger.getRedeemableChallenge(challenger.address).send()
         assertEquals(BigInteger.ZERO, redeemable.component1())
         assertEquals(BigInteger.ZERO, redeemable.component2())
         // check bounty
-        assertEquals(BigInteger.valueOf(7), helper.clgnToken.balanceOf(challenger.address).send())
+        assertEquals(BigInteger("7425000000000000000"), helper.clgnToken.balanceOf(challenger.address).send())
     }
 
     /**
@@ -255,14 +240,22 @@ class ChallengeAcceptanceTest {
      */
     @Test
     fun challengeRedeemAfterClose() {
-        ownerCreatesVault()
-        val bidPrice = BigInteger.valueOf(5)
-        val eauToLock = BigInteger.valueOf(2_000)
+        val initialAmount = toTokenAmount(100)
+        val tokenPrice = toTokenAmount(10)
+        ownerCreatesVault(initialAmount, tokenPrice)
+
+        val challenger = helper.credentialsCharlie
+        val challenger2 = helper.credentialsDave
+        val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)
+        val vaultByChallenger2 = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger2, helper.gasProvider)
+
+        val bidPrice = toTokenAmount(5)
+        val eauToLock = toTokenAmount(2_000)
         challenge(challenger, bidPrice, eauToLock)
 
         // challenger2 is winner now
-        val overbidPrice = BigInteger.valueOf(7)
-        val eauToLock2 = BigInteger.valueOf(3_000)
+        val overbidPrice = toTokenAmount(7)
+        val eauToLock2 = toTokenAmount(3_000)
         challenge(challenger2, overbidPrice, eauToLock2)
 
         // vault balances before

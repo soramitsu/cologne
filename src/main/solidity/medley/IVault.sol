@@ -32,14 +32,27 @@ interface IVault {
 
     /**
      * Stake CLGN on Vault
-     * @param amount - amount of CLGN to stake
+     * @param amount - amount of attoCLGN to stake
      */
     function stake(uint amount) external;
 
+    /**
+     * @param amount of tokens to buy on atomic smallest part of token (e.g. 10^-18)
+     * @param maxPrice of the 1 UserToken in attoEAU
+     * @param to - address to send to
+     */
     function buy(uint amount, uint maxPrice, address to) external;
 
+    /**
+     * Borrows EAU
+     * @param amount to borrow in attoEAU
+     */
     function borrow(uint amount) external;
 
+    /**
+     * Pay off debt
+     * @param amount - amount of attoEAU to pay off
+     */
     function payOff(uint amount) external;
 
     function close() external;
@@ -61,7 +74,9 @@ interface IVault {
     /** Maximum amount the owner can borrow (depends on TKN price and amount) */
     function getCreditLimit() external view returns (uint);
 
-    // Get amount of EAU the owner can borrow now before credit limit is exhausted
+    /**
+     * Get amount of attoEAU the owner can borrow now before credit limit is exhausted
+     */
     function canBorrow() external view returns (uint);
 
     function getTotalDebt() external view returns (uint);
@@ -76,7 +91,12 @@ interface IVault {
     /** Returns total fees repaid by owner (used to get liquidity fee discount) */
     function getTotalFeesRepaid() external view returns (uint);
 
-    // Returns User Token price in EAU
+    /**
+     * Returns User Token price in attoEAU
+     * Get user token price
+     * Initially assessed by the vault owner, may be reduced during Initial Liquidity Vault Auction
+     * Cannot be less than challenged price (if challenged)
+     */
     function getPrice() external view returns (uint);
 
     // Returns remaining User Token amount of vault
@@ -89,7 +109,7 @@ interface IVault {
     /**
      * Challenge
      * Lock EAU enough to buy out all User Tokens in case of default at specified price
-     * @param price - price to buy out User Tokens
+     * @param price - price to buy out User Tokens in attoEAU
      * @param eauToLock - EAU to lock for purchase (must be >= value of Tokens in EAU at specified price)
      */
     function challenge(uint price, uint eauToLock) external;
@@ -104,13 +124,13 @@ interface IVault {
     function redeemChallenge() external returns (uint eauAmount, uint userTokenAmount);
 
     /**
-     * Returns EAU amount locked in challenge
+     * Returns attoEAU amount locked in challenge
      * @param challenger address
      */
     function getChallengeLocked(address challenger) external view returns (uint eauLocked);
 
     /**
-     * Returns EAU and User Token amount can be redeemed
+     * Returns attoEAU and User Token amount can be redeemed
      * @param challenger address
      */
     function getRedeemableChallenge(address challenger) external view returns (uint eauAmount, uint userTokenAmount);

@@ -48,7 +48,6 @@ class VaultsList extends React.Component {
           await vaultContract.getCollateralInEau(),
         );
 
-
         try {
           await vaultContract.getTotalDebt().catch((err) => {
             console.log(err);
