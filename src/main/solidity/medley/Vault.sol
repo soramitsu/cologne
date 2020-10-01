@@ -474,8 +474,7 @@ contract Vault is IVault, Ownable {
         price = _price;
         if (_closeOutTime != 0) {
             require(_timeProvider.getTime() >= _closeOutTime, "Vault::getPrice(): Incorrect state: Limit is breached in the future!");
-            uint discount = ((_timeProvider.getTime().sub(_closeOutTime)).div(tickPriceChange));
-            discount = discount % 101;
+            uint discount = Math.min(((_timeProvider.getTime().sub(_closeOutTime)).div(tickPriceChange)), 100);
             price = price.mul(100 - discount).div(100);
         }
         return price;

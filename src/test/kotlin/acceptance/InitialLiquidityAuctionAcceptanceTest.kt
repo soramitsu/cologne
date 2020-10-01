@@ -238,4 +238,21 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
         assertEquals(toTokenAmount(33), clgnToken.balanceOf(buyer.address).send())
         assertEquals(clgnSupply.minus(toTokenAmount(34)), clgnToken.totalSupply().send())
     }
+
+    /**
+     * @given the Initial Liquidity Auction is over
+     * @when get token price
+     * @then 0 returned
+     */
+    @Test
+    fun initialLiquidityAuctionIsOver() {
+        ownerCreatesVault()
+        ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
+        // set bit more time after auction has failed
+        val time = helper.timeProvider.time.send().add(BigInteger.valueOf(280_000))
+        helper.timeProvider.setTime(time).send()
+
+        assertEquals(BigInteger.ZERO, vaultByOwner.price.send())
+    }
 }
