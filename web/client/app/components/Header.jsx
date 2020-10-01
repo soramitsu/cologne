@@ -4,7 +4,6 @@ import {Container, Menu} from "semantic-ui-react";
 import {connect} from "react-redux";
 
 import {NavLink} from "react-router-dom";
-import ethers from "ethers";
 import {changeLang} from "../redux/actions/Lang";
 import {timeProviderContract} from "../common/Resources";
 import {timeConverter} from "../common/Utils";
