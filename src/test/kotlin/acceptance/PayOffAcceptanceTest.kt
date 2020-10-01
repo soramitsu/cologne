@@ -17,12 +17,13 @@ class PayOffAcceptanceTest: AcceptanceTest() {
      */
     @Test
     fun payOffFee() {
-        ownerCreatesVault(initialAmount = BigInteger.valueOf(100_000), tokenPrice = BigInteger.valueOf(100))
-        val toBorrow = BigInteger.valueOf(100_000)
+        ownerCreatesVault()
+
+        val toBorrow = toTokenAmount(1_000)
         vaultByOwner.borrow(toBorrow).send()
         // pass one year to accrue fees
         passTime(BigInteger.valueOf(365*24*3600))
-        val feeToPayOff = BigInteger.valueOf(1_000)
+        val feeToPayOff = toTokenAmount(100)
         assertTrue(feeToPayOff <= vaultByOwner.fees.send())
         assertEquals(BigInteger.ZERO, vaultByOwner.totalFeesRepaid.send())
 

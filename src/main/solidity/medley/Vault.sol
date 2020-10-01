@@ -2,7 +2,7 @@
 
 pragma solidity ^0.7.0;
 
-import "./../token/ERC20/IERC20.sol";
+import "./../token/ERC20/ERC20.sol";
 import "./../token/ERC20/EAUToken.sol";
 import "./../token/ERC20/CLGNToken.sol";
 import "./IVault.sol";
@@ -32,10 +32,12 @@ contract Vault is IVault, Ownable {
     CLGNToken _clgnToken;
 
     // Owner ERC20 token
-    IERC20 _token;
+    ERC20 _userToken;
+
     // amount of ERC20 token the owner has deposited
     uint _tokenAmount;
-    // Owner token price assessed by the owner
+
+    // Owner token price assessed by the owner in attoEAU (10^-18 EAU for 1 UserToken)
     uint _price = 0;
 
     // Value of CLGN collateral in EAU
@@ -43,7 +45,9 @@ contract Vault is IVault, Ownable {
 
     // Initial amount of loan without fees
     uint _principal = 0;
+
     uint _feeAccrued = 0;
+
     uint _debtUpdateTime;
 
     uint _limitBreachedTime = 0;
@@ -106,7 +110,7 @@ contract Vault is IVault, Ownable {
         _medleyDao = IMedleyDAO(msg.sender);
         _eauToken = EAUToken(_medleyDao.getEauTokenAddress());
         _clgnToken = CLGNToken(_medleyDao.getClgnTokenAddress());
-        _token = IERC20(token);
+        _userToken = ERC20(token);
         _tokenAmount = initialAmount;
         _price = tokenPrice;
         _timeProvider = timeProvider;
@@ -117,17 +121,18 @@ contract Vault is IVault, Ownable {
         _stake(amount);
     }
 
+    // @dev See {IVault-buy}
     function buy(uint amount, uint maxPrice, address to) notClosed notSlashed public override {
         _buy(msg.sender, amount, maxPrice, to);
     }
 
     function _buy(address spender, uint amount, uint maxPrice, address to) private {
-        require(amount <= _token.balanceOf(address(this)), "Vault::buy(): Not enough tokens to sell");
+        require(amount <= _userToken.balanceOf(address(this)), "Vault::buy(): Not enough tokens to sell");
         uint price = getPrice();
         require(price > 0, "Vault::buy(): Initial Liquidity Auction is over");
         require(msg.sender == _challengeWinnerAddress || price > _challengers[_challengeWinnerAddress].price, "Vault::buy(): Initial Liquidity Auction is over. Only challenger can buy out.");
         require(price <= maxPrice, "Vault::buy(): Price too low");
-        uint costInEau = amount.mul(price);
+        uint costInEau = amount.mul(price).div(10 ** _userToken.decimals());
 
         // distribute penalty if Initial Liquidity Auction is active
         if (_closeOutTime != 0) {
@@ -151,7 +156,7 @@ contract Vault is IVault, Ownable {
         }
 
         _payOff(spender, costInEau);
-        require(_token.transfer(to, amount), "Vault::buy: cannot transfer User Token.");
+        require(_userToken.transfer(to, amount), "Vault::buy: cannot transfer User Token.");
         _tokenAmount -= amount;
 
         if (_price != price)
@@ -193,7 +198,7 @@ contract Vault is IVault, Ownable {
         }
         _eauToken.burn(principalPaid);
 
-        if (_principal.add(_feeAccrued) <= _tokenAmount.mul(_price).div(4)) {
+        if (_principal.add(_feeAccrued) <= _tokenAmount.mul(_price).div(10 ** _userToken.decimals()).div(4)) {
             _limitBreachedTime = 0;
             _closeOutTime = 0;
         }
@@ -207,7 +212,7 @@ contract Vault is IVault, Ownable {
 
     function close() onlyOwner public override {
         require(_getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
-        _token.transfer(owner(), _token.balanceOf(address(this)));
+        _userToken.transfer(owner(), _userToken.balanceOf(address(this)));
         _tokenAmount = 0;
         _clgnToken.transfer(owner(), _clgnToken.balanceOf(address(this)));
         _eauToken.transfer(owner(), _eauToken.balanceOf(address(this)).sub(eauForChallengers));
@@ -324,7 +329,7 @@ contract Vault is IVault, Ownable {
     }
 
     function getCreditLimit() public view override returns (uint) {
-        return _tokenAmount.mul(getPrice()).div(4);
+        return _tokenAmount.mul(getPrice()).div(4).div(10 ** _userToken.decimals());
     }
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
@@ -345,11 +350,7 @@ contract Vault is IVault, Ownable {
         return _getTotalDebt(_timeProvider.getTime()) != 0 && canBorrow() == 0;
     }
 
-    /**
-     * Get user token price
-     * Initially assessed by the vault owner, may be reduced during Initial Liquidity Vault Auction
-     * Cannot be less than challenged price (if challenged)
-     */
+    // @dev See {IVault-getPrice}
     function getPrice() public view override returns (uint price) {
         return Math.max(_getDutchAuctionPrice(), _challengers[_challengeWinnerAddress].price);
     }
@@ -386,7 +387,7 @@ contract Vault is IVault, Ownable {
         uint currentPrice = getPrice();
         require(price != 0, "Vault:challenge: price cannot be 0");
         require(price < currentPrice, "Vault:challenge: price too high");
-        require(eauToLock >= _tokenAmount * price, "Vault:challenge: lock amount in EAU not enough");
+        require(eauToLock >= _tokenAmount.mul(price).div(10 ** _userToken.decimals()), "Vault:challenge: lock amount in EAU not enough");
         require(_eauToken.transferFrom(msg.sender, address(this), eauToLock), "Vault:challenge: cannot transfer EAU.");
         eauForChallengers += eauToLock;
         Challenge memory newChallenge = Challenge(price, eauToLock);
@@ -417,7 +418,7 @@ contract Vault is IVault, Ownable {
     // @dev See {IVault-getChallengeLocked}
     function getChallengeLocked(address challenger) public override view returns (uint eauLocked) {
         if (challenger == _challengeWinnerAddress) {
-            return _challengers[_challengeWinnerAddress].price.mul(_tokenAmount);
+            return _challengers[_challengeWinnerAddress].price.mul(_tokenAmount).div(10 ** _userToken.decimals());
         }
         return 0;
     }
@@ -429,7 +430,7 @@ contract Vault is IVault, Ownable {
 
         if (challenger == _challengeWinnerAddress) {
             uint price = getPrice();
-            eauAmount -= _tokenAmount * _challengers[challenger].price;
+            eauAmount -= _tokenAmount.mul(_challengers[challenger].price).div(10 ** _userToken.decimals());
 
             // if Initial Liquidity auction passed
             if (price == _challengers[challenger].price) {
@@ -492,7 +493,7 @@ contract Vault is IVault, Ownable {
         limitBreachedTime = _limitBreachedTime;
         feeAccrued = _feeAccrued;
         for (uint i = _debtUpdateTime; i < endTime; i = i + period) {
-            uint limit = _tokenAmount.mul(_price).div(4);
+            uint limit = _tokenAmount.mul(_price).div(_userToken.decimals()).div(4);
             // limit has been breached
             if (_principal.add(feeAccrued) > limit) {
                 if (limitBreachedTime == 0) {

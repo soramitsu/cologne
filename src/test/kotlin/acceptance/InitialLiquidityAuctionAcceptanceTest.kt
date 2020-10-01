@@ -1,83 +1,18 @@
 package acceptance
 
-import contract.EAUToken
-import contract.CLGNToken
-import contract.UserToken
-import contract.Vault
-import helpers.ContractTestHelper
 import helpers.VaultState
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.testcontainers.containers.GenericContainer
-import org.testcontainers.images.builder.ImageFromDockerfile
-import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import org.web3j.crypto.Credentials
 import org.web3j.protocol.exceptions.TransactionException
 import java.math.BigInteger
-import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 @Testcontainers
-class InitialLiquidityAuctionAcceptanceTest {
+class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
 
-    @Container
-    private val ganache: GenericContainer<Nothing> =
-        GenericContainer<Nothing>(
-            ImageFromDockerfile()
-                .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
-        )
-            .withExposedPorts(8545)
-
-    val toBuy = BigInteger.valueOf(20)
-    val initialAmount = BigInteger.valueOf(100)
-    val tokenPrice = BigInteger.valueOf(2)
-    lateinit var helper: ContractTestHelper
-    lateinit var owner: Credentials
-    lateinit var intitator: Credentials
-    lateinit var buyer: Credentials
-    lateinit var userToken: UserToken
-    lateinit var vault: Vault
-    lateinit var intiatorVault: Vault
-    lateinit var eauToken: EAUToken
-    lateinit var buyerEAUToken: EAUToken
-    lateinit var buyerVault: Vault
-    lateinit var clgnToken: CLGNToken
-
-    @BeforeEach
-    fun setUp() {
-        helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
-        owner = helper.credentialsAlice
-        intitator = helper.credentialsBob
-        buyer = helper.credentialsCharlie
-        // load UserToken with owner credentials
-        userToken =
-            UserToken.load(helper.userToken.contractAddress, helper.web3, helper.credentialsSeed, helper.gasProvider)
-        // load EAU token with owner credentials
-        eauToken =
-            EAUToken.load(helper.eauToken.contractAddress, helper.web3, helper.credentialsSeed, helper.gasProvider)
-        buyerEAUToken = EAUToken.load(eauToken.contractAddress, helper.web3, buyer, helper.gasProvider)
-        clgnToken = helper.clgnToken
-    }
-
-    /**
-     * Deploy vault with Owner credentials
-     */
-    fun ownerCreatesVault(amount: BigInteger = initialAmount, price: BigInteger = tokenPrice) {
-        val vaultAddress = helper.createVault(owner, amount, price)
-        vault = Vault.load(vaultAddress, helper.web3, owner, helper.gasProvider)
-        intiatorVault = Vault.load(vault.contractAddress, helper.web3, intitator, helper.gasProvider)
-        buyerVault = Vault.load(vault.contractAddress, helper.web3, buyer, helper.gasProvider)
-    }
-
-    /**
-     * Breach credit limit
-     */
-    fun breachVault() {
-        val toBorrow = vault.canBorrow().send()
-        vault.borrow(toBorrow).send()
-    }
+    val toBuy = toTokenAmount(20)
 
     /**
      * @given a vault with limit not breached
@@ -89,7 +24,7 @@ class InitialLiquidityAuctionAcceptanceTest {
         ownerCreatesVault()
 
         assertThrows<TransactionException> {
-            intiatorVault.startInitialLiquidityAuction().send()
+            vaultByInitiator.startInitialLiquidityAuction().send()
         }
     }
 
@@ -101,10 +36,10 @@ class InitialLiquidityAuctionAcceptanceTest {
     @Test
     fun closeOutAlreadyClosed() {
         ownerCreatesVault()
-        vault.close().send()
+        vaultByOwner.close().send()
 
         assertThrows<TransactionException> {
-            intiatorVault.startInitialLiquidityAuction().send()
+            vaultByInitiator.startInitialLiquidityAuction().send()
         }
     }
 
@@ -116,11 +51,11 @@ class InitialLiquidityAuctionAcceptanceTest {
     @Test
     fun closeOutDoubleCalled() {
         ownerCreatesVault()
-        breachVault()
-        intiatorVault.startInitialLiquidityAuction().send()
+        ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
 
         assertThrows<TransactionException> {
-            intiatorVault.startInitialLiquidityAuction().send()
+            vaultByInitiator.startInitialLiquidityAuction().send()
         }
     }
 
@@ -132,30 +67,30 @@ class InitialLiquidityAuctionAcceptanceTest {
     @Test
     fun closeOutDutchAuctionPriceChange() {
         val timeInterval = BigInteger.valueOf(30 * 60) // 30 min
-        val price = BigInteger.valueOf(100000)
-        ownerCreatesVault(price = price)
-        breachVault()
-        assertEquals(VaultState.Defaulted.toBigInteger(), vault.state.send())
-        intiatorVault.startInitialLiquidityAuction().send()
-        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
+        val price = toTokenAmount(100000)
+        ownerCreatesVault(tokenPrice = price)
+        ownerBreachesVault()
+        assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
+        vaultByInitiator.startInitialLiquidityAuction().send()
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
 
-        assertEquals(price, vault.price.send())
-
-        helper.passTime(timeInterval)
-        assertEquals(BigInteger.valueOf(99000), vault.price.send())
-        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
+        assertEquals(price, vaultByOwner.price.send())
 
         helper.passTime(timeInterval)
-        assertEquals(BigInteger.valueOf(98000), vault.price.send())
-        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
+        assertEquals(toTokenAmount(99000), vaultByOwner.price.send())
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
+
+        helper.passTime(timeInterval)
+        assertEquals(toTokenAmount(98000), vaultByOwner.price.send())
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
 
         helper.passTime(timeInterval.multiply(BigInteger.valueOf(97)))
-        assertEquals(BigInteger.valueOf(1000), vault.price.send())
-        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vault.state.send())
+        assertEquals(toTokenAmount(1000), vaultByOwner.price.send())
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
 
         helper.passTime(timeInterval)
-        assertEquals(BigInteger.ZERO, vault.price.send())
-        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), vault.state.send())
+        assertEquals(toTokenAmount(0), vaultByOwner.price.send())
+        assertEquals(VaultState.WaitingForSlashing.toBigInteger(), vaultByOwner.state.send())
     }
 
     /**
@@ -167,20 +102,20 @@ class InitialLiquidityAuctionAcceptanceTest {
      */
     @Test
     fun buyTokensWhenVaultBreached() {
-        ownerCreatesVault()
-        breachVault()
-        val costInEau = toBuy.multiply(tokenPrice)
+        val price = toTokenAmount(2)
+        ownerCreatesVault(tokenPrice = price)
+        ownerBreachesVault()
+        val costInEau = getEauToBuyUserTokenAmount(toBuy, tokenPrice = price)
         helper.addEAU(buyer.address, costInEau)
 
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
+        eauTokenByBuyer.approve(vaultByOwner.contractAddress, costInEau).send()
+        vaultByBuyer.buy(toBuy, tokenPrice, buyer.address).send()
 
-        assertEquals(BigInteger.ZERO, eauToken.balanceOf(vault.contractAddress).send())
+        assertEquals(BigInteger.ZERO, eauToken.balanceOf(vaultByOwner.contractAddress).send())
         assertEquals(BigInteger.ZERO, eauToken.balanceOf(buyer.address).send())
-        assertEquals(initialAmount.minus(toBuy), userToken.balanceOf(vault.contractAddress).send())
+        assertEquals(initialAmount.minus(toBuy), userToken.balanceOf(vaultByOwner.contractAddress).send())
         assertEquals(toBuy, userToken.balanceOf(buyer.address).send())
     }
-
 
     /**
      * @given A breached vault with closed out process initiated 30*60*100 = 180000 seconds ago. Dutch auction is
@@ -191,17 +126,17 @@ class InitialLiquidityAuctionAcceptanceTest {
     @Test
     fun buyTokensWhenInitialLiquidityAuctionIsOver() {
         ownerCreatesVault()
-        breachVault()
-        val costInEau = toBuy.multiply(tokenPrice)
+        ownerBreachesVault()
+        val costInEau = getEauToBuyUserTokenAmount(toBuy)
         helper.addEAU(buyer.address, costInEau)
-        vault.startInitialLiquidityAuction().send()
+        vaultByOwner.startInitialLiquidityAuction().send()
         helper.passTime(BigInteger.valueOf(30 * 60 * 100))
 
-        assertEquals(BigInteger.ZERO, vault.price.send())
+        assertEquals(BigInteger.ZERO, vaultByOwner.price.send())
 
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
+        eauTokenByBuyer.approve(vaultByOwner.contractAddress, costInEau).send()
         assertThrows<TransactionException> {
-            buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
+            vaultByBuyer.buy(toBuy, tokenPrice, buyer.address).send()
         }
     }
 
@@ -209,27 +144,33 @@ class InitialLiquidityAuctionAcceptanceTest {
      * @given A breached vault with close-out process started. The vault has 100 TKN at price TKN/EAU = 2 and debt is
      * 50 EAU. Credit limit is 50 EAU.
      * @when a buyer buys 1 TKN for 2 EAU
-     * @then the debt is paid off partially and breach is covered. Vault debt is 48 EAU, credit limit is 49 EAU (for 99
+     * @then the debt is paid off partially and breach is covered. Vault debt is 48 EAU, credit limit is 49,5 EAU (for 99
      * TKN) and can borrow 1 EAU
      */
     @Test
     fun buyTokensToCoverBreach() {
-        ownerCreatesVault()
-        val toBorrow = vault.canBorrow().send()
-        breachVault()
-        vault.startInitialLiquidityAuction().send()
-        val toBuy = BigInteger.ONE
-        val costInEau = toBuy.multiply(tokenPrice)
+        val initialSuppty = toTokenAmount(100)
+        val price = toTokenAmount(2)
+        ownerCreatesVault(initialAmount = initialSuppty, tokenPrice = price)
+        val debtBefore = vaultByOwner.canBorrow().send()
+        ownerBreachesVault()
+        vaultByOwner.startInitialLiquidityAuction().send()
+        val toBuy = toTokenAmount(1)
+        val costInEau = getEauToBuyUserTokenAmount(toBuy, tokenPrice = price)
         helper.addEAU(buyer.address, costInEau)
-        assertEquals(true, vault.isLimitBreached.send())
+        assertEquals(true, vaultByOwner.isLimitBreached.send())
 
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        buyerVault.buy(toBuy, tokenPrice, buyer.address).send()
+        eauTokenByBuyer.approve(vaultByOwner.contractAddress, costInEau).send()
+        vaultByBuyer.buy(toBuy, tokenPrice, buyer.address).send()
 
-        assertEquals(false, vault.isLimitBreached.send())
-        assertEquals(toBorrow.minus(costInEau), vault.totalDebt.send())
-        assertEquals(BigInteger.valueOf(49), vault.creditLimit.send())
-        assertEquals(BigInteger.ONE, vault.canBorrow().send())
+        assertEquals(false, vaultByOwner.isLimitBreached.send())
+        // 10% is penalty, the rest to pay off
+        assertEquals(
+            debtBefore.minus(costInEau.minus(costInEau.divide(BigInteger.TEN))),
+            vaultByOwner.totalDebt.send()
+        )
+        assertEquals(BigInteger("49500000000000000000"), vaultByOwner.creditLimit.send())
+        assertEquals(BigInteger("1300000000000000000"), vaultByOwner.canBorrow().send())
     }
 
     /**
@@ -241,29 +182,30 @@ class InitialLiquidityAuctionAcceptanceTest {
      */
     @Test
     fun buyTokensToCoverBreachAfterTime() {
-        ownerCreatesVault()
-        val toBorrow = vault.canBorrow().send()
-        breachVault()
-        vault.startInitialLiquidityAuction().send()
+        val price = toTokenAmount(2)
+        ownerCreatesVault(tokenPrice = price)
+        val toBorrow = vaultByOwner.canBorrow().send()
+        ownerBreachesVault()
+        vaultByOwner.startInitialLiquidityAuction().send()
         helper.passTime(BigInteger.valueOf(30 * 60 * 50))
-        val toBuy = BigInteger.valueOf(20)
-        val price = vault.price.send()
-        assertEquals(BigInteger.ONE, price)
-        val costInEau = toBuy.multiply(price)
+        val toBuy = toTokenAmount(20)
+        val currentPrice = vaultByOwner.price.send()
+        assertEquals(toTokenAmount(1), currentPrice)
+        val costInEau = getEauToBuyUserTokenAmount(toBuy, tokenPrice = currentPrice)
         helper.addEAU(buyer.address, costInEau)
-        assertEquals(true, vault.isLimitBreached.send())
+        assertEquals(true, vaultByOwner.isLimitBreached.send())
         // add CLGN to swap for penalty
         val penaltyInClgn = toBuy.div(BigInteger.TEN).div(helper.clgnEauPrice)
         helper.addCLGN(helper.marketAdaptor.contractAddress, penaltyInClgn)
 
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        buyerVault.buy(toBuy, price, buyer.address).send()
+        eauTokenByBuyer.approve(vaultByOwner.contractAddress, costInEau).send()
+        vaultByBuyer.buy(toBuy, currentPrice, buyer.address).send()
 
-        assertEquals(true, vault.isLimitBreached.send())
+        assertEquals(true, vaultByOwner.isLimitBreached.send())
         // old debt - (payed in EAU - 10% penalty)
         val expectedDebt = toBorrow.minus(costInEau.minus(costInEau.divide(BigInteger.TEN)))
-        assertEquals(expectedDebt, vault.totalDebt.send())
-        assertEquals(BigInteger.ZERO, vault.canBorrow().send())
+        assertEquals(expectedDebt, vaultByOwner.totalDebt.send())
+        assertEquals(BigInteger.ZERO, vaultByOwner.canBorrow().send())
     }
 
     /**
@@ -277,23 +219,23 @@ class InitialLiquidityAuctionAcceptanceTest {
      */
     @Test
     fun distributeBounty() {
-        val toBuy = BigInteger.valueOf(2000)
-        val price = BigInteger.ONE
-        val costInEau = toBuy.multiply(price)
+        val toBuy = toTokenAmount(2000)
+        val price = toTokenAmount(1)
+        val costInEau = getEauToBuyUserTokenAmount(toBuy, tokenPrice = price)
         helper.addEAU(buyer.address, costInEau)
-        ownerCreatesVault(amount = BigInteger.valueOf(8000), price = price)
-        breachVault()
-        intiatorVault.startInitialLiquidityAuction().send()
+        ownerCreatesVault(initialAmount = toTokenAmount(8000), tokenPrice = price)
+        ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
         // add CLGN to swap for penalty
         val penaltyInClgn = toBuy.div(BigInteger.TEN).div(helper.clgnEauPrice)
         helper.addCLGN(helper.marketAdaptor.contractAddress, penaltyInClgn)
         val clgnSupply = clgnToken.totalSupply().send()
 
-        buyerEAUToken.approve(vault.contractAddress, costInEau).send()
-        buyerVault.buy(toBuy, price, buyer.address).send()
+        eauTokenByBuyer.approve(vaultByOwner.contractAddress, costInEau).send()
+        vaultByBuyer.buy(toBuy, price, buyer.address).send()
 
-        assertEquals(BigInteger.valueOf(33), clgnToken.balanceOf(intitator.address).send())
-        assertEquals(BigInteger.valueOf(33), clgnToken.balanceOf(buyer.address).send())
-        assertEquals(clgnSupply.minus(BigInteger.valueOf(34)), clgnToken.totalSupply().send())
+        assertEquals(toTokenAmount(33), clgnToken.balanceOf(initiator.address).send())
+        assertEquals(toTokenAmount(33), clgnToken.balanceOf(buyer.address).send())
+        assertEquals(clgnSupply.minus(toTokenAmount(34)), clgnToken.totalSupply().send())
     }
 }
