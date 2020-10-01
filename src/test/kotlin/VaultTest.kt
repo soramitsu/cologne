@@ -54,6 +54,7 @@ class VaultTest : AcceptanceTest() {
         assertEquals(initialAmount, userToken.balanceOf(owner.address).send())
         assertEquals(eauBalance, eauToken.balanceOf(owner.address).send())
         assertEquals(clgnBalance.add(stake), clgnToken.balanceOf(owner.address).send())
+        assertEquals(BigInteger.ZERO, vaultByOwner.totalDebt.send())
     }
 
     /**
