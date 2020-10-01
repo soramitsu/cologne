@@ -302,7 +302,8 @@ contract Vault is IVault, Ownable {
     }
 
 
-    function getTotalDebt() notClosed public view override returns (uint debt) {
+    function getTotalDebt() public view override returns (uint debt) {
+        if (_closed) return 0;
         return _getTotalDebt(_timeProvider.getTime());
     }
 
