@@ -12,13 +12,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 @Testcontainers
 class ClgnAuctionAccept : AcceptanceTest() {
 
-    fun failInitialAuction() {
-        vaultByInitiator.startInitialLiquidityAuction().send()
-        // Dutch auction has passed
-        val time = helper.timeProvider.time.send().add(BigInteger.valueOf(180000))
-        helper.timeProvider.setTime(time).send()
-    }
-
     /**
      * @given closed vault
      * @when cover shortfall called
@@ -62,6 +55,7 @@ class ClgnAuctionAccept : AcceptanceTest() {
         ownerCreatesVault()
         val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
         ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()
 
         assertThrows<TransactionException> {
@@ -80,6 +74,7 @@ class ClgnAuctionAccept : AcceptanceTest() {
         ownerCreatesVault()
         val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
         ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()
 
         assertThrows<TransactionException> {
@@ -101,6 +96,7 @@ class ClgnAuctionAccept : AcceptanceTest() {
         ownerCreatesVault()
         val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, coverInitiator, helper.gasProvider)
         ownerBreachesVault()
+        vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()
         assertEquals(BigInteger.ZERO, vaultByOwner.fees.send())
         assertEquals(toTokenAmount(1000), vaultByOwner.principal.send())

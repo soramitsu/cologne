@@ -12,15 +12,6 @@ import java.math.BigInteger
 class ClgnStakeSlashingAcceptanceTest : AcceptanceTest() {
 
     /**
-     * Fail initial liquidity auction
-     */
-    fun failInitialAuction() {
-        // Dutch auction has passed
-        val time = helper.timeProvider.time.send().add(BigInteger.valueOf(180000))
-        helper.timeProvider.setTime(time).send()
-    }
-
-    /**
      * @given the vault is closed
      * @when call slash
      * @then error returned - closed

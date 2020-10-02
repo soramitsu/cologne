@@ -118,4 +118,12 @@ open class AcceptanceTest {
         return amount.multiply(tokenPrice).divide(BigInteger.TEN.pow(userToken.decimals().send().toInt()))
     }
 
+    /**
+     * Fail initial liquidity auction
+     */
+    fun failInitialAuction() {
+        // Fail Initial Liquidity auction - Dutch auction has passed
+        val time = helper.timeProvider.time.send().add(BigInteger.valueOf(180000))
+        helper.timeProvider.setTime(time).send()
+    }
 }

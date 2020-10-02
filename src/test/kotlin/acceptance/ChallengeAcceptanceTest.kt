@@ -33,15 +33,6 @@ class ChallengeAcceptanceTest : AcceptanceTest() {
     }
 
     /**
-     * Fail initial liquidity auction
-     */
-    fun failInitialAuction() {
-        // Fail Initial Liquidity auction - Dutch auction has passed
-        val time = helper.timeProvider.time.send().add(BigInteger.valueOf(180000))
-        helper.timeProvider.setTime(time).send()
-    }
-
-    /**
      * @given a vault with no challengers
      * @when get challenge winner called
      * @then zero values returned
