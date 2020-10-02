@@ -303,20 +303,21 @@ contract Vault is IVault, Ownable {
 
 
     function getTotalDebt() public view override returns (uint debt) {
-        if (_closed) return 0;
         return _getTotalDebt(_timeProvider.getTime());
     }
 
-    function _getTotalDebt(uint time) notClosed private view returns (uint debt) {
+    function _getTotalDebt(uint time) private view returns (uint debt) {
+        if (_closed) return 0;
         debt = _principal.add(_getFees(time));
         return debt;
     }
 
-    function getPrincipal() notClosed public view override returns (uint) {
+    function getPrincipal() public view override returns (uint) {
+        if (_closed) return 0;
         return _principal;
     }
 
-    function getFees() notClosed public view override returns (uint) {
+    function getFees() public view override returns (uint) {
         return _getFees(_timeProvider.getTime());
     }
 
@@ -324,7 +325,8 @@ contract Vault is IVault, Ownable {
         return _totalFeesRepaid;
     }
 
-    function _getFees(uint time) notClosed private view returns (uint fees) {
+    function _getFees(uint time) private view returns (uint fees) {
+        if (_closed) return 0;
         (fees,) = _calculateFeesAccrued(time);
         return fees;
     }
@@ -334,7 +336,8 @@ contract Vault is IVault, Ownable {
     }
 
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
-    function canBorrow() notClosed public view override returns (uint) {
+    function canBorrow() public view override returns (uint) {
+        if (_closed) return 0;
         uint debt = _getTotalDebt(_timeProvider.getTime());
         uint creditLimit = getCreditLimit();
         if (creditLimit <= debt) {
@@ -347,7 +350,8 @@ contract Vault is IVault, Ownable {
     /**
      * Checks if credit limit is breached
      */
-    function isLimitBreached() notClosed public view returns (bool) {
+    function isLimitBreached() public view returns (bool) {
+        if (_closed) return false;
         return _getTotalDebt(_timeProvider.getTime()) != 0 && canBorrow() == 0;
     }
 
