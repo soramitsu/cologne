@@ -88,8 +88,8 @@ class ContractTestHelper(host: String, port: Int) {
         eauToken.transferOwnership(medleyDAO.contractAddress).send()
 
         // add liquidity to market
-        eauToken.transfer(marketAdaptor.contractAddress, toTokenAmount(100_000)).send()
-        clgnToken.transfer(marketAdaptor.contractAddress, toTokenAmount(100_000)).send()
+        eauToken.transfer(marketAdaptor.contractAddress, toTokenAmount(1_000_000)).send()
+        clgnToken.transfer(marketAdaptor.contractAddress, toTokenAmount(1_000_000)).send()
     }
 
     fun addCLGN(address: String, amount: BigInteger) {

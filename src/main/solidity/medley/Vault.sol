@@ -325,6 +325,36 @@ contract Vault is IVault, Ownable {
         return _totalFeesRepaid;
     }
 
+    function getFeeRate() public view override returns (uint) {
+        // Initial rate is 101%
+        uint feeRate = (101 * 10 ** 18);
+
+        // Discount for stake
+        if (getPrincipal() == 0) {
+            // 1% if no debt
+            feeRate = 10 ** 18;
+        } else {
+            uint stakeDiscount = (getCollateralInEau()).mul(100 * 10 ** 18).div(getPrincipal());
+            if (feeRate >= stakeDiscount)
+                feeRate -= stakeDiscount;
+            else
+                feeRate = 10 ** 18;
+        }
+
+        // discount is 0.1% for every 1,000 EAU paid off
+        uint discount = (_totalFeesRepaid).div(10000);
+        if (feeRate >= discount)
+            feeRate -= discount;
+        else
+            feeRate = 10 ** 18;
+
+        // 1% is minimal fee rate
+        if (feeRate < (10 ** 18))
+            feeRate = 10 ** 18;
+
+        return feeRate;
+    }
+
     function _getFees(uint time) private view returns (uint fees) {
         if (_closed) return 0;
         (fees,) = _calculateFeesAccrued(time);
