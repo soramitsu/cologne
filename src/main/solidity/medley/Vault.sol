@@ -170,7 +170,9 @@ contract Vault is IVault, Ownable {
 
         _medleyDao.mintEAU(owner(), amount);
         _principal += amount;
-        _debtUpdateTime = _timeProvider.getTime();
+
+        _updateDebt();
+
         _recordAccounting(AccountingRecordType.Withdrawal, amount, _debtUpdateTime);
     }
 
@@ -226,8 +228,7 @@ contract Vault is IVault, Ownable {
         _closeOutTime = _timeProvider.getTime();
         _closeOutInitiator = msg.sender;
 
-        (_feeAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
-        _debtUpdateTime = _timeProvider.getTime();
+        _updateDebt();
     }
 
     function slash() notClosed notSlashed initialAuctionIsOver public override {
@@ -491,6 +492,7 @@ contract Vault is IVault, Ownable {
      */
     function _stake(uint clgnAmount) private {
         require(_clgnToken.transferFrom(msg.sender, address(this), clgnAmount), "Vault::stake: cannot transfer ClGN.");
+        _updateDebt();
         _collateral = _collateral + clgnAmount;
     }
 
@@ -520,9 +522,9 @@ contract Vault is IVault, Ownable {
         // period to accrue fee in seconds (one day)
         uint period = 86400;
 
-        // TODO calculate rate according the table
-        // rate per period multiplied by 1'000'000
-        uint rate = uint(100000).div(365);
+        // rate per period multiplied by 10 ** 20
+        uint rateDivider = 10 ** 20;
+        uint rate = getFeeRate().div(365);
 
         limitBreachedTime = _limitBreachedTime;
         feeAccrued = _feeAccrued;
@@ -534,9 +536,14 @@ contract Vault is IVault, Ownable {
                     limitBreachedTime = i;
                 }
             }
-            feeAccrued = feeAccrued + (_principal + feeAccrued) * rate / 1000000;
+            feeAccrued = feeAccrued + (_principal + feeAccrued).mul(rate).div(rateDivider);
         }
         return (feeAccrued, limitBreachedTime);
+    }
+
+    function _updateDebt() internal {
+        (_feeAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
+        _debtUpdateTime = _timeProvider.getTime();
     }
 
     /**
