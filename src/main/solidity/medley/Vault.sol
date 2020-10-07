@@ -141,7 +141,6 @@ contract Vault is IVault, Ownable {
                 require(_eauToken.transferFrom(spender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
             require(_eauToken.balanceOf(address(this)) >= penalty, "Vault:buy: Not enough EAU for penalty");
 
-            _eauToken.approve(address(_medleyDao.getClgnMarket()), penalty);
             uint clgnBought = _buyClgnForEau(penalty);
 
             uint initiatorBounty = clgnBought.mul(33).div(100);
@@ -234,12 +233,7 @@ contract Vault is IVault, Ownable {
     function slash() notClosed notSlashed initialAuctionIsOver public override {
         // determine amount CLGN to sell
         uint debt = getTotalDebt();
-
-        address[] memory path = new address[](2);
-        path[0] = address(_clgnToken);
-        path[1] = address(_eauToken);
-        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsIn(debt, path);
-        uint clgnToSell = amounts[0];
+        uint clgnToSell = _getClgnInForEauOut(debt);
         if (clgnToSell > _collateral)
             clgnToSell = _collateral;
 
@@ -257,8 +251,7 @@ contract Vault is IVault, Ownable {
         // sell staked CLGN for EAU
         if (clgnToSell > _collateral)
             clgnToSell = _collateral;
-        amounts = _medleyDao.getClgnMarket().getAmountsOut(clgnToSell, path);
-        uint eauToBuy = amounts[1];
+        uint eauToBuy = _getEauOutForClgnIn(clgnToSell);
         if (eauToBuy > debt)
             eauToBuy = debt;
         uint eauLeftover = _sellClgnForEau(clgnToSell, eauToBuy);
@@ -289,11 +282,10 @@ contract Vault is IVault, Ownable {
 
         uint debt = getTotalDebt();
         require(debt > 0, "Cover shortfall: no shortfall to cover");
-        uint clgnHolderBalanceInEau = _medleyDao.getClgnPriceOracle().consult(address(_clgnToken), _clgnToken.balanceOf(msg.sender));
-        require(clgnHolderBalanceInEau >= debt.div(20), "Only CLGN holder with at least 5% of remaining outstanding EAU debt can initiate a CLGN mint");
+        require(_getEauOutForClgnIn(_clgnToken.balanceOf(msg.sender)) >= debt.div(20), "Only CLGN holder with at least 5% of remaining outstanding EAU debt can initiate a CLGN mint");
 
         uint bounty = debt.div(10);
-        uint clgnToMint = _medleyDao.getClgnPriceOracle().consult(address(_eauToken), debt.add(bounty));
+        uint clgnToMint = _getClgnInForEauOut(debt.add(bounty));
         _medleyDao.mintCLGN(address(this), clgnToMint);
         _sellClgnForEau(clgnToMint, debt.add(bounty));
         _eauToken.burn(debt);
@@ -402,7 +394,7 @@ contract Vault is IVault, Ownable {
      * Get CLGN collateral in EAU
      */
     function getCollateralInEau() public view override returns (uint) {
-        return _medleyDao.getClgnPriceOracle().consult(address(_clgnToken), _collateral);
+        return _getEauOutForClgnIn(_collateral);
     }
 
     function getState() public view override returns (VaultState) {
@@ -577,7 +569,6 @@ contract Vault is IVault, Ownable {
         uint toBuyClgn = amount.div(2);
 
         // 50% to buy and burn CLGN
-        _eauToken.approve(address(_medleyDao.getClgnMarket()), toBuyClgn);
         uint clgnBought = _buyClgnForEau(toBuyClgn);
         _clgnToken.burn(clgnBought);
 
@@ -586,26 +577,45 @@ contract Vault is IVault, Ownable {
     }
 
     /**
+     * Returns how much EAU can get for selling clgnInAmount
+     */
+    function _getEauOutForClgnIn(uint clgnInAmount) private view returns (uint eauOutAmount) {
+        address[] memory path = new address[](2);
+        path[0] = address(_clgnToken);
+        path[1] = address(_eauToken);
+        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsOut(clgnInAmount, path);
+        return amounts[1];
+    }
+
+    /**
+     * Returns how much CLGN need to buy eauOutAmount
+     */
+    function _getClgnInForEauOut(uint eauOutAmount) private view returns (uint clgnAmount) {
+        address[] memory path = new address[](2);
+        path[0] = address(_clgnToken);
+        path[1] = address(_eauToken);
+        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsIn(eauOutAmount, path);
+        return amounts[0];
+    }
+
+    /**
      * Buy as many CLGN as possible for exact EAU amount
      * @param eauAmount - to spend
      * @return bought - amount bought
      */
     function _buyClgnForEau(uint eauAmount) private returns (uint bought) {
+        _eauToken.approve(address(_medleyDao.getClgnMarket()), eauAmount);
+
         address[] memory path = new address[](2);
         path[0] = address(_eauToken);
         path[1] = address(_clgnToken);
 
-        // buy at price from oracle -10%
-        // TODO clarify price
-        uint clgnBoughtExpected = _medleyDao.getClgnPriceOracle().consult(address(_eauToken), eauAmount).mul(9).div(10);
+        // deadline is 1h
+        uint deadline = block.timestamp + 3600;
 
-        // TODO clarify deadline for Uniswap
-        uint deadline = _timeProvider.getTime() + 10000;
-
-        uint[] memory amounts = _medleyDao.getClgnMarket().swapExactTokensForTokens(eauAmount, clgnBoughtExpected, path, address(this), deadline);
+        uint[] memory amounts = _medleyDao.getClgnMarket().swapExactTokensForTokens(eauAmount, 0, path, address(this), deadline);
         bought = amounts[1];
         require(eauAmount == amounts[0], "Vault::buyCLGN(): not exact amount of EAU sold to buy CLGN");
-        require(clgnBoughtExpected <= bought, "Vault::buyCLGN(): CLGN bought is less than expected");
         return bought;
     }
 
@@ -619,11 +629,8 @@ contract Vault is IVault, Ownable {
         path[0] = address(_clgnToken);
         path[1] = address(_eauToken);
 
-        // TODO check oracle price
-        // uint clgnToSell = _medleyDao.getClgnPriceOracle().consult(address(_eauToken), debt);
-
-        // TODO clarify deadline for Uniswap
-        uint deadline = _timeProvider.getTime() + 10000;
+        // deadline is 1h
+        uint deadline = block.timestamp + 3600;
 
         uint[] memory amounts = _medleyDao.getClgnMarket().swapTokensForExactTokens(exactEauAmount, maxClgnAmount, path, address(this), deadline);
         uint sold = amounts[0];

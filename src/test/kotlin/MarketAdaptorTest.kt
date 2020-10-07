@@ -164,7 +164,6 @@ class MarketAdaptorTest {
      */
     @Test
     fun swapExactTokensForTokensEau2ClgnSunnyDay() {
-        val oldEauMarketBalance = helper.eauToken.balanceOf(market.contractAddress).send()
         val oldClgnMarketBalance = helper.clgnToken.balanceOf(market.contractAddress).send()
         helper.addCLGN(market.contractAddress, BigInteger.valueOf(5))
         helper.addEAU(buyer, BigInteger.TEN)

@@ -2,7 +2,6 @@
 
 pragma solidity ^0.7.0;
 
-import "./../market/IPriceOracle.sol";
 import "./../market/IMarketAdaptor.sol";
 
 interface IMedleyDAO {
@@ -24,8 +23,6 @@ interface IMedleyDAO {
     function getEauTokenAddress() external view returns (address);
 
     function listVaults() external view returns (address [] memory);
-
-    function getClgnPriceOracle() external view returns (IPriceOracle);
 
     function getClgnMarket() external view returns (IMarketAdaptor);
 

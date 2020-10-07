@@ -41,7 +41,6 @@ class ContractTestHelper(host: String, port: Int) {
     val clgnToken: CLGNToken
     val eauToken: EAUToken
     val userToken: UserToken
-    val priceOracle: PriceOracleMock
     val marketAdaptor: MarketAdaptorMock
     val medleyDAO: MedleyDAO
     lateinit var vaultByOwner: Vault
@@ -55,14 +54,6 @@ class ContractTestHelper(host: String, port: Int) {
         clgnToken = CLGNToken.deploy(web3, credentialsSeed, gasProvider).send()
         eauToken = EAUToken.deploy(web3, credentialsSeed, gasProvider).send()
         userToken = UserToken.deploy(web3, credentialsSeed, gasProvider).send()
-        priceOracle =
-            PriceOracleMock.deploy(
-                web3,
-                credentialsSeed,
-                gasProvider,
-                clgnToken.contractAddress,
-                eauToken.contractAddress
-            ).send()
         marketAdaptor =
             MarketAdaptorMock.deploy(
                 web3,
@@ -78,7 +69,6 @@ class ContractTestHelper(host: String, port: Int) {
             gasProvider,
             clgnToken.contractAddress,
             eauToken.contractAddress,
-            priceOracle.contractAddress,
             marketAdaptor.contractAddress,
             timeProvider.contractAddress
         ).send()

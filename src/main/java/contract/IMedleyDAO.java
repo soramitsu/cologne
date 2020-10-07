@@ -44,8 +44,6 @@ public class IMedleyDAO extends Contract {
 
     public static final String FUNC_GETCLGNMARKET = "getClgnMarket";
 
-    public static final String FUNC_GETCLGNPRICEORACLE = "getClgnPriceOracle";
-
     public static final String FUNC_GETCLGNTOKENADDRESS = "getClgnTokenAddress";
 
     public static final String FUNC_GETEAUTOKENADDRESS = "getEauTokenAddress";
@@ -123,13 +121,6 @@ public class IMedleyDAO extends Contract {
 
     public RemoteFunctionCall<String> getClgnMarket() {
         final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETCLGNMARKET, 
-                Arrays.<Type>asList(), 
-                Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
-        return executeRemoteCallSingleValueReturn(function, String.class);
-    }
-
-    public RemoteFunctionCall<String> getClgnPriceOracle() {
-        final org.web3j.abi.datatypes.Function function = new org.web3j.abi.datatypes.Function(FUNC_GETCLGNPRICEORACLE, 
                 Arrays.<Type>asList(), 
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeRemoteCallSingleValueReturn(function, String.class);

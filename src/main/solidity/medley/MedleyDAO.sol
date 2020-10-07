@@ -7,7 +7,6 @@ import "./Vault.sol";
 import "./../token/ERC20/IERC20.sol";
 import "./../token/ERC20/EAUToken.sol";
 import "./../token/ERC20/CLGNToken.sol";
-import "./../market/IPriceOracle.sol";
 import "./../market/IMarketAdaptor.sol";
 import "./ITimeProvider.sol";
 
@@ -19,17 +18,13 @@ contract MedleyDAO is IMedleyDAO {
     CLGNToken _clgnToken;
     EAUToken _eauToken;
 
-    // CLGN/DAO price feed
-    IPriceOracle _clgnPriceOracle;
-
     IMarketAdaptor _clgnMarket;
 
     ITimeProvider _timeProvider;
 
-    constructor(address clgnToken, address eauToken, address clgnPriceOracle, address clgnMarket, address timeProvider) {
+    constructor(address clgnToken, address eauToken, address clgnMarket, address timeProvider) {
         _clgnToken = CLGNToken(clgnToken);
         _eauToken = EAUToken(eauToken);
-        _clgnPriceOracle = IPriceOracle(clgnPriceOracle);
         _clgnMarket = IMarketAdaptor(clgnMarket);
         _timeProvider = ITimeProvider(timeProvider);
     }
@@ -64,10 +59,6 @@ contract MedleyDAO is IMedleyDAO {
 
     function listVaults() public view override returns (address [] memory) {
         return _vaults;
-    }
-
-    function getClgnPriceOracle() external view override returns (IPriceOracle) {
-        return _clgnPriceOracle;
     }
 
     function getClgnMarket() external view override returns (IMarketAdaptor) {
