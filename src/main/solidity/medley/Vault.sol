@@ -2,37 +2,30 @@
 
 pragma solidity ^0.7.0;
 
-import "./../token/ERC20/ERC20.sol";
-import "./../token/ERC20/EAUToken.sol";
-import "./../token/ERC20/CLGNToken.sol";
+import "./../token/ERC20/SafeERC20.sol";
+import "./../token/ERC20/IEAUToken.sol";
+import "./../token/ERC20/ICLGNToken.sol";
 import "./IVault.sol";
 import "./IMedleyDAO.sol";
 import "./../math/SafeMath.sol";
 import "./../math/Math.sol";
 import "./ITimeProvider.sol";
 import "./../utils/Ownable.sol";
+import "../token/ERC20/IUserToken.sol";
 
 contract Vault is IVault, Ownable {
     using SafeMath for uint;
-
-    // Types of accounting records
-    enum AccountingRecordType {Deposit, Withdrawal}
-
-    struct AccountingRecord {
-        uint recordType;
-        uint amount;
-        uint time;
-    }
-
-    AccountingRecord[] _accountingBook;
+    using SafeERC20 for IUserToken;
+    using SafeERC20 for IEAUToken;
+    using SafeERC20 for ICLGNToken;
 
     IMedleyDAO _medleyDao;
 
-    EAUToken _eauToken;
-    CLGNToken _clgnToken;
+    IEAUToken _eauToken;
+    ICLGNToken _clgnToken;
 
     // Owner ERC20 token
-    ERC20 _userToken;
+    IUserToken _userToken;
 
     // amount of ERC20 token the owner has deposited
     uint _tokenAmount;
@@ -108,9 +101,9 @@ contract Vault is IVault, Ownable {
         uint tokenPrice,
         ITimeProvider timeProvider) Ownable(owner) {
         _medleyDao = IMedleyDAO(msg.sender);
-        _eauToken = EAUToken(_medleyDao.getEauTokenAddress());
-        _clgnToken = CLGNToken(_medleyDao.getClgnTokenAddress());
-        _userToken = ERC20(token);
+        _eauToken = IEAUToken(_medleyDao.getEauTokenAddress());
+        _clgnToken = ICLGNToken(_medleyDao.getClgnTokenAddress());
+        _userToken = IUserToken(token);
         _tokenAmount = initialAmount;
         _price = tokenPrice;
         _timeProvider = timeProvider;
@@ -138,16 +131,16 @@ contract Vault is IVault, Ownable {
         if (_closeOutTime != 0) {
             uint penalty = costInEau.div(10);
             if (spender != address(this))
-                require(_eauToken.transferFrom(spender, address(this), penalty), "Vault::buy: cannot transfer EAU penalty.");
+                _eauToken.safeTransferFrom(spender, address(this), penalty);
             require(_eauToken.balanceOf(address(this)) >= penalty, "Vault:buy: Not enough EAU for penalty");
 
             uint clgnBought = _buyClgnForEau(penalty);
 
             uint initiatorBounty = clgnBought.mul(33).div(100);
-            require(_clgnToken.transfer(_closeOutInitiator, initiatorBounty), "Vault::buy: transfer CLGN bounty to initiator");
+            _clgnToken.safeTransfer(_closeOutInitiator, initiatorBounty);
 
             uint bidderBounty = clgnBought.mul(33).div(100);
-            require(_clgnToken.transfer(to, bidderBounty), "Vault::buy: transfer CLGN bounty to bidder");
+            _clgnToken.safeTransfer(to, bidderBounty);
 
             _clgnToken.burn(clgnBought.sub(initiatorBounty).sub(bidderBounty));
 
@@ -155,7 +148,7 @@ contract Vault is IVault, Ownable {
         }
 
         _payOff(spender, costInEau);
-        require(_userToken.transfer(to, amount), "Vault::buy: cannot transfer User Token.");
+        _userToken.safeTransfer(to, amount);
         _tokenAmount -= amount;
 
         if (_price != price)
@@ -171,8 +164,6 @@ contract Vault is IVault, Ownable {
         _principal += amount;
 
         _updateDebt();
-
-        _recordAccounting(AccountingRecordType.Withdrawal, amount, _debtUpdateTime);
     }
 
     function payOff(uint amount) notClosed notSlashed public override {
@@ -181,10 +172,8 @@ contract Vault is IVault, Ownable {
 
     function _payOff(address spender, uint amount) private {
         if (spender != address(this))
-            require(_eauToken.transferFrom(spender, address(this), amount), "Vault: cannot transfer EAU.");
+            _eauToken.safeTransferFrom(spender, address(this), amount);
         require(_eauToken.balanceOf(address(this)) >= amount, "Vault:payOff: Not enough EAU to pay off");
-
-        _recordAccounting(AccountingRecordType.Deposit, amount, _timeProvider.getTime());
 
         uint leftover = _payOffFees(amount);
 
@@ -213,10 +202,10 @@ contract Vault is IVault, Ownable {
 
     function close() onlyOwner public override {
         require(_getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
-        _userToken.transfer(owner(), _userToken.balanceOf(address(this)));
+        _userToken.safeTransfer(owner(), _userToken.balanceOf(address(this)));
         _tokenAmount = 0;
-        _clgnToken.transfer(owner(), _clgnToken.balanceOf(address(this)));
-        _eauToken.transfer(owner(), _eauToken.balanceOf(address(this)).sub(eauForChallengers));
+        _clgnToken.safeTransfer(owner(), _clgnToken.balanceOf(address(this)));
+        _eauToken.safeTransfer(owner(), _eauToken.balanceOf(address(this)).sub(eauForChallengers));
         _closed = true;
     }
 
@@ -241,9 +230,9 @@ contract Vault is IVault, Ownable {
         uint penalty = clgnToSell.div(10);
         uint part = penalty.div(4);
         // 25% of penalty to close out initiator
-        require(_clgnToken.transfer(_closeOutInitiator, part), "Vault::slash(): pay close out bounty error");
+        _clgnToken.safeTransfer(_closeOutInitiator, part);
         // 25% of penalty to slashing initiator
-        require(_clgnToken.transfer(msg.sender, part), "Vault::slash(): pay slashing bounty error");
+        _clgnToken.safeTransfer(msg.sender, part);
         // remaining to burn
         _clgnToken.burn(penalty.sub(part.mul(2)));
         _collateral -= penalty;
@@ -291,7 +280,7 @@ contract Vault is IVault, Ownable {
         _eauToken.burn(debt);
         _principal = 0;
         _debtUpdateTime = _timeProvider.getTime();
-        require(_eauToken.transfer(msg.sender, bounty), "Vault::coverShortfall(): cannot transfer EAU bounty.");
+        _eauToken.safeTransfer(msg.sender, bounty);
     }
 
 
@@ -416,7 +405,7 @@ contract Vault is IVault, Ownable {
         require(price != 0, "Vault:challenge: price cannot be 0");
         require(price < currentPrice, "Vault:challenge: price too high");
         require(eauToLock >= _tokenAmount.mul(price).div(10 ** _userToken.decimals()), "Vault:challenge: lock amount in EAU not enough");
-        require(_eauToken.transferFrom(msg.sender, address(this), eauToLock), "Vault:challenge: cannot transfer EAU.");
+        _eauToken.safeTransferFrom(msg.sender, address(this), eauToLock);
         eauForChallengers += eauToLock;
         Challenge memory newChallenge = Challenge(price, eauToLock);
         _challengers[msg.sender] = newChallenge;
@@ -437,7 +426,7 @@ contract Vault is IVault, Ownable {
             _challengers[msg.sender].eauAmountToLock -= eauAmount;
         }
 
-        require(_eauToken.transfer(msg.sender, eauAmount), "Vault:redeemChallenge(): cannot transfer EAU");
+        _eauToken.safeTransfer(msg.sender, eauAmount);
         eauForChallengers -= eauAmount;
 
         return (eauAmount, userTokenAmount);
@@ -475,15 +464,11 @@ contract Vault is IVault, Ownable {
         return (_challengeWinnerAddress, _challengers[_challengeWinnerAddress].price);
     }
 
-    function _recordAccounting(AccountingRecordType recordType, uint amount, uint time) private {
-        // TODO implement
-    }
-
     /**
      * Adds CLGN to stake
      */
     function _stake(uint clgnAmount) private {
-        require(_clgnToken.transferFrom(msg.sender, address(this), clgnAmount), "Vault::stake: cannot transfer ClGN.");
+        _clgnToken.safeTransferFrom(msg.sender, address(this), clgnAmount);
         _updateDebt();
         _collateral = _collateral + clgnAmount;
     }
@@ -604,7 +589,7 @@ contract Vault is IVault, Ownable {
      * @return bought - amount bought
      */
     function _buyClgnForEau(uint eauAmount) private returns (uint bought) {
-        _eauToken.approve(address(_medleyDao.getClgnMarket()), eauAmount);
+        _eauToken.safeApprove(address(_medleyDao.getClgnMarket()), eauAmount);
 
         address[] memory path = new address[](2);
         path[0] = address(_eauToken);
@@ -623,7 +608,7 @@ contract Vault is IVault, Ownable {
      * Sell as few CLGN as possible to get exact amount of eau
      */
     function _sellClgnForEau(uint maxClgnAmount, uint exactEauAmount) private returns (uint bought) {
-        _clgnToken.approve(address(_medleyDao.getClgnMarket()), maxClgnAmount);
+        _clgnToken.safeApprove(address(_medleyDao.getClgnMarket()), maxClgnAmount);
 
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
@@ -636,6 +621,9 @@ contract Vault is IVault, Ownable {
         uint sold = amounts[0];
         bought = amounts[1];
         require(sold <= maxClgnAmount, "Vault::sellCLGN(): CLGN sold is more than expected");
+        if (sold < maxClgnAmount) {
+            _clgnToken.safeDecreaseAllowance(address(_medleyDao.getClgnMarket()), maxClgnAmount.sub(sold));
+        }
         require(bought == exactEauAmount, "Vault::sellCLGN(): not exact amount of EAU bought for CLGN");
         return bought;
     }
