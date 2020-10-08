@@ -30,6 +30,7 @@ open class AcceptanceTest {
     lateinit var helper: ContractTestHelper
     lateinit var owner: Credentials
     lateinit var buyer: Credentials
+
     // Initial Liquidity Auction Initiator
     lateinit var initiator: Credentials
     lateinit var slasher: Credentials
@@ -112,6 +113,15 @@ open class AcceptanceTest {
 
     fun toPrettyBalance(balance: BigInteger): String {
         return balance.div(BigInteger.TEN.pow(18)).toString()
+    }
+
+    /**
+     * Converts to interest rate representation
+     * 1% = toInterestRate(1, 100);
+     * 1,01% = toInterestRate(101, 10000);
+     */
+    fun toInterestRate(rate: Long, divider: Long): BigInteger {
+        return BigInteger.valueOf(rate).multiply(BigInteger.TEN.pow(20)).divide(BigInteger.valueOf(divider));
     }
 
     fun getEauToBuyUserTokenAmount(amount: BigInteger, tokenPrice: BigInteger = this.tokenPrice): BigInteger {

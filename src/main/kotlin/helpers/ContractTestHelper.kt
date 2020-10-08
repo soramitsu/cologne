@@ -41,7 +41,6 @@ class ContractTestHelper(host: String, port: Int) {
     val clgnToken: CLGNToken
     val eauToken: EAUToken
     val userToken: UserToken
-    val priceOracle: PriceOracleMock
     val marketAdaptor: MarketAdaptorMock
     val medleyDAO: MedleyDAO
     lateinit var vaultByOwner: Vault
@@ -55,14 +54,6 @@ class ContractTestHelper(host: String, port: Int) {
         clgnToken = CLGNToken.deploy(web3, credentialsSeed, gasProvider).send()
         eauToken = EAUToken.deploy(web3, credentialsSeed, gasProvider).send()
         userToken = UserToken.deploy(web3, credentialsSeed, gasProvider).send()
-        priceOracle =
-            PriceOracleMock.deploy(
-                web3,
-                credentialsSeed,
-                gasProvider,
-                clgnToken.contractAddress,
-                eauToken.contractAddress
-            ).send()
         marketAdaptor =
             MarketAdaptorMock.deploy(
                 web3,
@@ -78,7 +69,6 @@ class ContractTestHelper(host: String, port: Int) {
             gasProvider,
             clgnToken.contractAddress,
             eauToken.contractAddress,
-            priceOracle.contractAddress,
             marketAdaptor.contractAddress,
             timeProvider.contractAddress
         ).send()
@@ -88,8 +78,8 @@ class ContractTestHelper(host: String, port: Int) {
         eauToken.transferOwnership(medleyDAO.contractAddress).send()
 
         // add liquidity to market
-        eauToken.transfer(marketAdaptor.contractAddress, toTokenAmount(100_000)).send()
-        clgnToken.transfer(marketAdaptor.contractAddress, toTokenAmount(100_000)).send()
+        eauToken.transfer(marketAdaptor.contractAddress, toTokenAmount(1_000_000)).send()
+        clgnToken.transfer(marketAdaptor.contractAddress, toTokenAmount(1_000_000)).send()
     }
 
     fun addCLGN(address: String, amount: BigInteger) {

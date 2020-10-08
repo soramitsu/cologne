@@ -79,8 +79,14 @@ interface IVault {
      */
     function canBorrow() external view returns (uint);
 
+    /**
+     * Returns Total debt = principal + fees accrued
+     */
     function getTotalDebt() external view returns (uint);
 
+    /**
+     * Returns debt principal
+     */
     function getPrincipal() external view returns (uint);
 
     /**
@@ -88,8 +94,16 @@ interface IVault {
      */
     function getFees() external view returns (uint);
 
-    /** Returns total fees repaid by owner (used to get liquidity fee discount) */
+    /**
+     * Returns total fees repaid by owner (used to get liquidity fee discount)
+     */
     function getTotalFeesRepaid() external view returns (uint);
+
+    /**
+     * Returns instant annual fee rate (depends on repayment history, collateral, debt and challenge price)
+     * Returned value should be multiplied by 10^18 to get interest rate percent.
+     */
+    function getFeeRate() external view returns (uint);
 
     /**
      * Returns User Token price in attoEAU
@@ -99,9 +113,14 @@ interface IVault {
      */
     function getPrice() external view returns (uint);
 
-    // Returns remaining User Token amount of vault
+    /**
+     * Returns remaining User Token amount of vault
+     */
     function getTokenAmount() external view returns (uint);
 
+    /**
+     * Returns value of CLGN staked in EAU
+     */
     function getCollateralInEau() external view returns (uint);
 
     function getState() external view returns (VaultState);
