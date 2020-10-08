@@ -1,14 +1,8 @@
-import {Button, Container, Header} from "semantic-ui-react";
+import {Button, Container} from "semantic-ui-react";
 import React from "react";
 import {ethers} from "ethers";
 import {connect} from "react-redux";
-import {
-  clgnTokenAbi,
-  cologneDaoContract,
-  signer,
-  timeProviderContract,
-  userTokenContract,
-} from "../common/Resources";
+import {timeProviderContract, userTokenContract} from "../common/Resources";
 
 class ServiceActions extends React.Component {
   state = {
@@ -17,54 +11,10 @@ class ServiceActions extends React.Component {
 
   mintUserToken = async () => {
     const {
-      user: {account},
+      user: {address},
     } = this.props;
 
-    await userTokenContract.mint(account, ethers.utils.parseEther("13.37"));
-  };
-
-  mintClgnToken = async () => {
-    const {
-      user: {account},
-    } = this.props;
-
-    const address = await cologneDaoContract.getClgnTokenAddress();
-
-    const clgnTokenContract = new ethers.Contract(
-      address,
-      clgnTokenAbi,
-      signer,
-    );
-
-    await clgnTokenContract.mint(account, ethers.utils.parseEther("13.37"));
-  };
-
-  transfer = async () => {
-    const marketAddress = await cologneDaoContract.getClgnMarket();
-    const clgnAddress = await cologneDaoContract.getClgnTokenAddress();
-    const eauTokenAddress = await cologneDaoContract.getEauTokenAddress();
-
-    const clgnTokenContract = new ethers.Contract(
-      clgnAddress,
-      clgnTokenAbi,
-      signer,
-    );
-
-    await clgnTokenContract.transfer(
-      marketAddress,
-      ethers.utils.parseEther("12376679"),
-    );
-
-    const eauTokenContract = new ethers.Contract(
-      eauTokenAddress,
-      clgnTokenAbi,
-      signer,
-    );
-
-    await eauTokenContract.transfer(
-      marketAddress,
-      ethers.utils.parseEther("12376679"),
-    );
+    await userTokenContract.mint(address, ethers.utils.parseEther("13.37"));
   };
 
   timeTravel = async (param) => {
@@ -99,11 +49,9 @@ class ServiceActions extends React.Component {
         <Button
           color="teal"
           onClick={() => {
-            this.setState((prevState) => {
-              this.setState({
-                shown: !prevState.shown,
-              });
-            });
+            this.setState((prevState) => ({
+              shown: !prevState.shown,
+            }));
           }}
         >
           {shown ? "Hide service actions" : "Show service actions"}
@@ -115,14 +63,6 @@ class ServiceActions extends React.Component {
         >
           <Button color="teal" onClick={this.mintUserToken}>
             Mint user tokens
-          </Button>
-
-          <Button
-            style={{marginTop: "1em"}}
-            color="teal"
-            onClick={this.transfer}
-          >
-            Move CLGN to market
           </Button>
 
           <Button

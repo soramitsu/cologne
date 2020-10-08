@@ -3,6 +3,7 @@
  */
 
 import ethers from "ethers";
+import {loginUser} from "../redux/actions/User";
 
 export const clgnTokenAbi = [
   {inputs: [], stateMutability: "nonpayable", type: "constructor"},
@@ -698,7 +699,23 @@ export const VaultStates = [
 
 export const stateFormatter = (state) => VaultStates[state];
 
+// Network changed handler
+window.ethereum.on("chainChanged", (chainId) => {
+  console.log(`Network has changed, new network id: ${chainId}`);
+  window.location.reload();
+});
+
+// Account changed handler
+window.ethereum.on("accountsChanged", (newAccounts) => {
+  console.log(`Account has changed, new account: ${newAccounts[0]}`);
+  loginUser({
+    address: newAccounts[0],
+  });
+  window.location.reload();
+});
+
 export const provider = new ethers.providers.Web3Provider(window.ethereum);
+
 export const signer = provider.getSigner();
 export const cologneDaoAddress = "0x79eafd0b5ec8d3f945e6bb2817ed90b046c0d0af";
 export const userTokenAddress = "0x7d73424a8256c0b2ba245e5d5a3de8820e45f390";

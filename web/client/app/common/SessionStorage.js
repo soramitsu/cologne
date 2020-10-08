@@ -17,6 +17,6 @@ export const saveState = (state) => {
     const serializedState = JSON.stringify(state);
     sessionStorage.setItem("state", serializedState);
   } catch (err) {
-    console.log(`Error writing to sessionStorage:${err}`);
+    console.log(`Error writing to sessionStorage: ${err}`);
   }
 };

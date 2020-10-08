@@ -41,7 +41,7 @@ export function OnboardingButton() {
       setAccounts(newAccounts);
       dispatch(
         loginUser({
-          account: newAccounts[0],
+          address: newAccounts[0],
         }),
       );
     }

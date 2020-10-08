@@ -1,5 +1,4 @@
 /* eslint-disable no-restricted-globals */
-import store from "../redux/Store";
 
 export const timeConverter = (timestamp) => {
   const a = new Date(timestamp * 1000);
@@ -49,20 +48,3 @@ export const findGetParameter = (parameterName) => {
 
   return result;
 };
-
-export const rusFormatter = new Intl.NumberFormat("ru-RU", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  currencyDisplay: "symbol",
-});
-
-export const engFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  currencyDisplay: "symbol",
-});
-
-export const beforePriceShown = (number) =>
-  store.getState().lang.formatter.format(number);

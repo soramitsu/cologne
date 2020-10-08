@@ -8,6 +8,7 @@ import PayOffModal from "./Modals/PayOffModal";
 import CoverShortfallModal from "./Modals/CoverShortfallModal";
 import SlashModal from "./Modals/SlashModal";
 import StartAuctionModal from "./Modals/StartAuctionModal";
+import ChallengeModal from "./Modals/ChallengeModal";
 
 export default class VaultActions extends React.Component {
   render() {

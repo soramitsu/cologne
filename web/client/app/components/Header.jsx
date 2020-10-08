@@ -4,7 +4,6 @@ import {Container, Menu} from "semantic-ui-react";
 import {connect} from "react-redux";
 
 import {NavLink} from "react-router-dom";
-import {changeLang} from "../redux/actions/Lang";
 import {timeProviderContract} from "../common/Resources";
 import {timeConverter} from "../common/Utils";
 
@@ -41,7 +40,7 @@ class Header extends React.Component {
 
   render() {
     const {
-      user: {account},
+      user: {address},
     } = this.props;
 
     const {time} = this.state;
@@ -60,8 +59,8 @@ class Header extends React.Component {
           </Menu.Item>
           <Menu.Item>Current time: {time}</Menu.Item>
           <Menu.Menu position="right">
-            {account && (
-              <Menu.Item as="a">Connected address: {account}</Menu.Item>
+            {address && (
+              <Menu.Item as="a">Connected address: {address}</Menu.Item>
             )}
           </Menu.Menu>
         </Container>
@@ -70,15 +69,8 @@ class Header extends React.Component {
   }
 }
 
-const mapDispatchToProps = (dispatch) => ({
-  changeLang(lang) {
-    dispatch(changeLang(lang));
-  },
-});
-
 const mapStateToProps = (state) => ({
-  lang: state.lang.dict,
   user: state.user,
 });
 
-export default connect(mapStateToProps, mapDispatchToProps)(Header);
+export default connect(mapStateToProps)(Header);

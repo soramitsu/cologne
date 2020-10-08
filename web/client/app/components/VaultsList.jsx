@@ -1,19 +1,15 @@
 import React from "react";
 import {connect} from "react-redux";
-import {Container, Grid, GridRow, Header, Table} from "semantic-ui-react";
+import {Container, Grid, Header, Transition, Item} from "semantic-ui-react";
 import ethers from "ethers";
-import {
-  cologneDaoContract,
-  vaultAbi,
-  signer,
-  stateFormatter,
-} from "../common/Resources";
+import {cologneDaoContract, vaultAbi, signer} from "../common/Resources";
 import CreateVault from "./CreateVault";
-import VaultsActions from "./VaultsActions";
+import VaultDetails from "./VaultDetails";
 
 class VaultsList extends React.Component {
   state = {
     items: [],
+    expanded: {},
   };
 
   componentDidMount() {
@@ -27,16 +23,11 @@ class VaultsList extends React.Component {
     }
   }
 
-  startPolling() {
-    const self = this;
-    setTimeout(async () => {
-      await self.poll();
-      self.timer = setInterval(self.poll, 1000);
-    }, 1000);
-  }
-
   poll = async () => {
     const vaults = await cologneDaoContract.listVaults();
+    const {
+      user: {address},
+    } = this.props;
 
     const enrichedVaults = await Promise.all(
       vaults.map(async (vault) => {
@@ -64,6 +55,16 @@ class VaultsList extends React.Component {
 
         const isOwner = await vaultContract.isOwner();
 
+        const ownerAddress = await vaultContract.owner();
+
+        const challengeLocked = ethers.utils.formatEther(
+          await vaultContract.getChallengeLocked(address),
+        );
+
+        const redeemableChallenge = await vaultContract.getRedeemableChallenge(address);
+
+        const challengeWinner = await vaultContract.getChallengeWinner();
+
         return {
           vaultContract,
           isOwner,
@@ -74,6 +75,10 @@ class VaultsList extends React.Component {
           tokenAmount,
           creditLimit,
           vaultState,
+          ownerAddress,
+          challengeLocked,
+          redeemableChallenge,
+          challengeWinner,
         };
       }),
     );
@@ -83,8 +88,25 @@ class VaultsList extends React.Component {
     });
   };
 
+  toggleExpand = (address) => {
+    this.setState((prevState) => ({
+      expanded: {
+        ...prevState.expanded,
+        [address]: !prevState.expanded[address],
+      },
+    }));
+  };
+
+  startPolling() {
+    const self = this;
+    setTimeout(async () => {
+      await self.poll();
+      self.timer = setInterval(self.poll, 1000);
+    }, 1000);
+  }
+
   render() {
-    const {items} = this.state;
+    const {items, expanded} = this.state;
 
     return (
       <Container>
@@ -96,53 +118,25 @@ class VaultsList extends React.Component {
 
         <Header as="h3">Deployed Vaults</Header>
 
-        <Table basic="very" celled collapsing>
-          <Table.Header style={{marginTop: "1em"}}>
-            <Table.Row>
-              <Table.HeaderCell>Address</Table.HeaderCell>
-              <Table.HeaderCell>Price in EAU</Table.HeaderCell>
-              <Table.HeaderCell>Collateral in EAU</Table.HeaderCell>
-              <Table.HeaderCell>Total debt in EAU</Table.HeaderCell>
-              <Table.HeaderCell>Token amount</Table.HeaderCell>
-              <Table.HeaderCell>Credit limit</Table.HeaderCell>
-              <Table.HeaderCell>Vault state</Table.HeaderCell>
-              <Table.HeaderCell>Owned by you</Table.HeaderCell>
-              <Table.HeaderCell>Actions</Table.HeaderCell>
-            </Table.Row>
-          </Table.Header>
-
-          <Table.Body>
-            {items.map((item) => (
-              <Table.Row key={item.address}>
-                <Table.Cell>
-                  <Header as="h4">{item.address}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{item.price}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{item.collateral}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{item.totalDebt}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{item.tokenAmount}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{item.creditLimit}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{stateFormatter(item.vaultState)}</Header>
-                </Table.Cell>
-                <Table.Cell>
-                  <Header as="h4">{item.isOwner ? "Yes" : "No"}</Header>
-                </Table.Cell>
-                <VaultsActions item={item} />
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table>
+        <Transition.Group as={Item.Group} duration={200} divided size="huge">
+          {items.map((item) => (
+            <Item key={item.address}>
+              <Item.Content>
+                <Item.Header as="a">{item.address}</Item.Header>
+                <Item.Meta>
+                  Owned by {item.isOwner ? "you" : item.ownerAddress}, contains{" "}
+                  {item.tokenAmount} tokens
+                </Item.Meta>
+                <Item.Description
+                  onClick={() => this.toggleExpand(item.address)}
+                >
+                  {expanded[item.address] ? "Hide details" : "Expand details"}
+                </Item.Description>
+                {expanded[item.address] && <VaultDetails vault={item} />}
+              </Item.Content>
+            </Item>
+          ))}
+        </Transition.Group>
       </Container>
     );
   }
