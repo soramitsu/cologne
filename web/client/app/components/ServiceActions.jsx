@@ -2,7 +2,7 @@ import {Button, Container} from "semantic-ui-react";
 import React from "react";
 import {ethers} from "ethers";
 import {connect} from "react-redux";
-import {timeProviderContract, userTokenContract} from "../common/Resources";
+import {getTimeProviderContract, getUserTokenContract} from "../common/Eth";
 
 class ServiceActions extends React.Component {
   state = {
@@ -14,27 +14,27 @@ class ServiceActions extends React.Component {
       user: {address},
     } = this.props;
 
-    await userTokenContract.mint(address, ethers.utils.parseEther("13.37"));
+    await getUserTokenContract().mint(
+      address,
+      ethers.utils.parseEther("13.37"),
+    );
   };
 
   timeTravel = async (param) => {
-    const time = await timeProviderContract.getTime();
+    const timeContract = getTimeProviderContract();
+    const time = await timeContract.getTime();
 
     switch (param) {
       case "fd":
-        await timeProviderContract.setTime(
-          Number.parseInt(time.toString()) + 86400,
-        );
+        await timeContract.setTime(Number.parseInt(time.toString()) + 86400);
         break;
       case "f3d":
-        await timeProviderContract.setTime(
+        await timeContract.setTime(
           Number.parseInt(time.toString()) + 86400 * 3,
         );
         break;
       case "fh":
-        await timeProviderContract.setTime(
-          Number.parseInt(time.toString()) + 1800,
-        );
+        await timeContract.setTime(Number.parseInt(time.toString()) + 1800);
         break;
       default:
         break;

@@ -3,7 +3,8 @@ import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
 import {connect} from "react-redux";
-import {clgnTokenAbi, cologneDaoContract, signer} from "../../common/Resources";
+import {getCologneDaoContract, getSigner} from "../../common/Eth";
+import {tokenAbi} from "../../common/Abi";
 
 class BuyModal extends React.Component {
   state = {
@@ -33,12 +34,12 @@ class BuyModal extends React.Component {
       error: false,
     });
 
-    const eauTokenAddress = await cologneDaoContract.getEauTokenAddress();
+    const eauTokenAddress = await getCologneDaoContract().getEauTokenAddress();
 
     const eauTokenContract = new ethers.Contract(
       eauTokenAddress,
-      clgnTokenAbi,
-      signer,
+      tokenAbi,
+      getSigner(),
     );
 
     await eauTokenContract.approve(

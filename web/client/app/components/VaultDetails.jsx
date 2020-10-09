@@ -3,8 +3,8 @@ import {connect} from "react-redux";
 import {Container, Header, Table, Tab} from "semantic-ui-react";
 import {ethers} from "ethers";
 import VaultsActions from "./VaultsActions";
-import {stateFormatter} from "../common/Resources";
 import ChallengeActions from "./ChallengeActions";
+import {stateFormatter} from "../common/Eth";
 
 class VaultDetails extends React.Component {
   renderMainTab = () => {

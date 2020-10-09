@@ -2,7 +2,8 @@ import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
-import {clgnTokenAbi, cologneDaoContract, signer} from "../../common/Resources";
+import {getCologneDaoContract, getSigner} from "../../common/Eth";
+import {tokenAbi} from "../../common/Abi";
 
 export default class StakeModal extends React.Component {
   state = {
@@ -31,12 +32,12 @@ export default class StakeModal extends React.Component {
       error: false,
     });
 
-    const clgnTokenAddress = await cologneDaoContract.getClgnTokenAddress();
+    const clgnTokenAddress = await getCologneDaoContract().getClgnTokenAddress();
 
     const clgnTokenContract = new ethers.Contract(
       clgnTokenAddress,
-      clgnTokenAbi,
-      signer,
+      tokenAbi,
+      getSigner(),
     );
 
     await clgnTokenContract.approve(

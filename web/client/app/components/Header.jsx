@@ -4,8 +4,8 @@ import {Container, Menu} from "semantic-ui-react";
 import {connect} from "react-redux";
 
 import {NavLink} from "react-router-dom";
-import {timeProviderContract} from "../common/Resources";
 import {timeConverter} from "../common/Utils";
+import {getTimeProviderContract} from "../common/Eth";
 
 class Header extends React.Component {
   state = {
@@ -32,7 +32,7 @@ class Header extends React.Component {
   }
 
   poll = async () => {
-    const time = await timeProviderContract.getTime();
+    const time = await getTimeProviderContract().getTime();
     this.setState({
       time: timeConverter(time.toString()),
     });
@@ -54,9 +54,9 @@ class Header extends React.Component {
           <Menu.Item header as={NavLink} to="/main" activeclassname="active">
             Dashboard
           </Menu.Item>
-          <Menu.Item header as={NavLink} to="/login" activeclassname="active">
-            Login
-          </Menu.Item>
+          {/*<Menu.Item header as={NavLink} to="/login" activeclassname="active">*/}
+          {/*  Login*/}
+          {/*</Menu.Item>*/}
           <Menu.Item>Current time: {time}</Menu.Item>
           <Menu.Menu position="right">
             {address && (

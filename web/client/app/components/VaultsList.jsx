@@ -2,9 +2,10 @@ import React from "react";
 import {connect} from "react-redux";
 import {Container, Grid, Header, Transition, Item} from "semantic-ui-react";
 import ethers from "ethers";
-import {cologneDaoContract, vaultAbi, signer} from "../common/Resources";
 import CreateVault from "./CreateVault";
 import VaultDetails from "./VaultDetails";
+import {vaultAbi} from "../common/Abi";
+import {getCologneDaoContract} from "../common/Eth";
 
 class VaultsList extends React.Component {
   state = {
@@ -24,7 +25,12 @@ class VaultsList extends React.Component {
   }
 
   poll = async () => {
-    const vaults = await cologneDaoContract.listVaults();
+    const contract = getCologneDaoContract();
+    console.log(contract);
+
+
+    const vaults = await getCologneDaoContract().listVaults();
+
     const {
       user: {address},
     } = this.props;
@@ -61,7 +67,9 @@ class VaultsList extends React.Component {
           await vaultContract.getChallengeLocked(address),
         );
 
-        const redeemableChallenge = await vaultContract.getRedeemableChallenge(address);
+        const redeemableChallenge = await vaultContract.getRedeemableChallenge(
+          address,
+        );
 
         const challengeWinner = await vaultContract.getChallengeWinner();
 

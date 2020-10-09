@@ -1,11 +1,8 @@
 import ethers from "ethers";
 import React from "react";
 import {Button, Container, Form, Message} from "semantic-ui-react";
-import {
-  cologneDaoAddress,
-  cologneDaoContract,
-  userTokenContract,
-} from "../common/Resources";
+import {ganacheAddresses} from "../common/Constants";
+import {getCologneDaoContract, getUserTokenContract} from "../common/Eth";
 
 export default class CreateVault extends React.Component {
   state = {
@@ -28,13 +25,13 @@ export default class CreateVault extends React.Component {
     });
 
     // approve tx should be sent first for user token contract
-    await userTokenContract.approve(
-      cologneDaoAddress,
+    await getUserTokenContract().approve(
+      ganacheAddresses.cologneDaoAddress,
       ethers.utils.parseEther(tokenAmount),
     );
 
     // create vault itself
-    const res = await cologneDaoContract
+    const res = await getCologneDaoContract()
       .createVault(
         tokenAddress,
         ethers.utils.parseEther(tokenAmount),

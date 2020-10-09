@@ -1,6 +1,5 @@
-import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
+import {Button, Modal, Dropdown, Message} from "semantic-ui-react";
 import React from "react";
-import ethers from "ethers";
 
 export default class CloseModal extends React.Component {
   state = {
