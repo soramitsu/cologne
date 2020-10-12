@@ -25,10 +25,6 @@ class VaultsList extends React.Component {
   }
 
   poll = async () => {
-    const contract = getCologneDaoContract();
-    console.log(contract);
-
-
     const vaults = await getCologneDaoContract().listVaults();
 
     const {

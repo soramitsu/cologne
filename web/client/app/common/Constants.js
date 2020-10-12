@@ -12,7 +12,7 @@ export const gorliAddresses = {
 
 export const networkMapper = (chainId) => {
   switch (chainId) {
-    case "0x05":
+    case "0x5":
       return gorliAddresses;
     default:
       return ganacheAddresses;
