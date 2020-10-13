@@ -42,11 +42,17 @@ contract Vault is IVault, Ownable {
     // (address => stake) staked total by user
     // actual stake by user = staked by user * _stakeCurrent / _stakedTotal
     mapping(address => uint) _stakeByUser;
+    mapping(address => uint) _stakeRewardClaimedByUser;
 
     // Initial amount of loan without fees
     uint _principal = 0;
 
     uint _feeAccrued = 0;
+
+    // 50% of fees saved goes to co-stakeholders
+    uint _coStakerRewardAccrued = 0;
+
+    uint _coStakerRewardStash = 0;
 
     uint _debtUpdateTime;
 
@@ -133,19 +139,42 @@ contract Vault is IVault, Ownable {
     }
 
     // @dev See {IVault-getStakeReward}
-    function getStakeReward() public override view returns (uint) {
-        if (msg.sender == owner()) return 0;
+    function getStakeRewardAccrued(address stakeholder) public override view returns (uint) {
+        if (stakeholder == owner()) return 0;
 
-        // TODO
-        return 0;
+        uint totalReward;
+        (, totalReward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        if (_stakeByUser[owner()] == _stakedTotal) return 0;
+        return totalReward.mul(_stakeByUser[stakeholder]).div(_stakedTotal.sub(_stakeByUser[owner()]));
+    }
+
+    function getStakeRewardAccrued() public override view returns (uint reward) {
+        (, reward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        return reward;
+    }
+
+    function getStakeRewardToClaim(address stakeholder) public override view returns (uint reward) {
+        uint totalReward;
+        (, totalReward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        if (totalReward == 0)
+            return 0;
+
+        if (stakeholder == owner()) return 0;
+        if (_stakeByUser[owner()] == _stakedTotal) return 0;
+
+        return _coStakerRewardStash.mul(_stakeByUser[stakeholder]).div(_stakedTotal.sub(_stakeByUser[owner()])).sub(_stakeRewardClaimedByUser[stakeholder]);
     }
 
     // @dev See {IVault-withdrawStakeReward}
-    function withdrawStakeReward() public override returns (uint) {
-        if (msg.sender == owner()) return 0;
+    function claimStakeReward(address stakeholder) public override returns (uint) {
         _updateDebt();
-        // TODO
-        return 0;
+
+        if (msg.sender == owner()) return 0;
+
+        uint reward = getStakeRewardToClaim(stakeholder);
+        _eauToken.safeTransfer(stakeholder, reward);
+        _stakeRewardClaimedByUser[stakeholder] = reward;
+        return reward;
     }
 
     // @dev See {IVault-withdrawStake}
@@ -237,15 +266,11 @@ contract Vault is IVault, Ownable {
             _closeOutTime = 0;
         }
 
-        uint price = getPrice();
-        if (_price != price)
-            _price = price;
-
-        _debtUpdateTime = _timeProvider.getTime();
+        _price = getPrice();
     }
 
     function close() onlyOwner public override {
-        require(_getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
+        require(getTotalDebt() == 0, "Vault::close(): close allowed only if debt is paid off");
         _closed = true;
         _userToken.safeTransfer(owner(), _userToken.balanceOf(address(this)));
         _tokenAmount = 0;
@@ -302,11 +327,12 @@ contract Vault is IVault, Ownable {
         }
 
         // pay off fees accrued
-        require(eauLeftover <= _feeAccrued, "Slashing: Too many EAU got from slashing");
-        _distributeFee(eauLeftover);
+        require(eauLeftover <= _feeAccrued + _coStakerRewardAccrued, "Slashing: Too many EAU got from slashing");
+        _payOffFees(eauLeftover);
 
         // forgive fees
         _feeAccrued = 0;
+        //        _coStakerRewardAccrued = 0;
         _slashed = true;
     }
 
@@ -329,13 +355,11 @@ contract Vault is IVault, Ownable {
 
 
     function getTotalDebt() public view override returns (uint debt) {
-        return _getTotalDebt(_timeProvider.getTime());
-    }
-
-    function _getTotalDebt(uint time) private view returns (uint debt) {
         if (_closed) return 0;
-        debt = _principal.add(_getFees(time));
-        return debt;
+        uint fees;
+        uint reward;
+        (fees, reward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        return _principal.add(fees).add(reward).sub(_coStakerRewardStash);
     }
 
     function getPrincipal() public view override returns (uint) {
@@ -343,15 +367,15 @@ contract Vault is IVault, Ownable {
         return _principal;
     }
 
-    function getFees() public view override returns (uint) {
-        return _getFees(_timeProvider.getTime());
-    }
-
     function getTotalFeesRepaid() public view override returns (uint) {
         return _totalFeesRepaid;
     }
 
     function getFeeRate() public view override returns (uint) {
+        return _getFeeRate(getCollateralInEau());
+    }
+
+    function _getFeeRate(uint collateral) private view returns (uint) {
         // Initial rate is 101%
         uint feeRate = (101 * 10 ** 18);
 
@@ -360,7 +384,7 @@ contract Vault is IVault, Ownable {
             // 1% if no debt
             feeRate = 10 ** 18;
         } else {
-            uint stakeDiscount = (getCollateralInEau()).mul(100 * 10 ** 18).div(getPrincipal());
+            uint stakeDiscount = collateral.mul(100 * 10 ** 18).div(getPrincipal());
             if (feeRate >= stakeDiscount)
                 feeRate -= stakeDiscount;
             else
@@ -381,9 +405,9 @@ contract Vault is IVault, Ownable {
         return feeRate;
     }
 
-    function _getFees(uint time) private view returns (uint fees) {
+    function getFees() public view override returns (uint fees) {
         if (_closed) return 0;
-        (fees,) = _calculateFeesAccrued(time);
+        (fees, ,) = _calculateFeesAccrued(_timeProvider.getTime());
         return fees;
     }
 
@@ -394,7 +418,7 @@ contract Vault is IVault, Ownable {
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
     function canBorrow() public view override returns (uint) {
         if (_closed) return 0;
-        uint debt = _getTotalDebt(_timeProvider.getTime());
+        uint debt = getTotalDebt();
         uint creditLimit = getCreditLimit();
         if (creditLimit <= debt) {
             return 0;
@@ -408,7 +432,7 @@ contract Vault is IVault, Ownable {
      */
     function isLimitBreached() public view returns (bool) {
         if (_closed) return false;
-        return _getTotalDebt(_timeProvider.getTime()) != 0 && canBorrow() == 0;
+        return getTotalDebt() != 0 && canBorrow() == 0;
     }
 
     // @dev See {IVault-getPrice}
@@ -535,7 +559,10 @@ contract Vault is IVault, Ownable {
         return price;
     }
 
-    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint limitBreachedTime) {
+    /**
+     *
+     */
+    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint coStakerReward, uint limitBreachedTime) {
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
         uint endTime = time;
         // Stop calculate fee when close-out process started
@@ -547,11 +574,12 @@ contract Vault is IVault, Ownable {
 
         // rate per period multiplied by 10 ** 20
         uint rateDivider = 10 ** 20;
-        uint rate = getFeeRate().div(365);
-        // TODO add co-staking reward
+        uint rate = _getFeeRate(getCollateralInEau());
+        uint rateWithoutCoStakers = _getFeeRate(_getEauOutForClgnIn(getStake(owner())));
 
         limitBreachedTime = _limitBreachedTime;
         feeAccrued = _feeAccrued;
+        uint feeAccruedWithoutCoStakers = _feeAccrued;
         for (uint i = _debtUpdateTime; i < endTime; i = i + period) {
             uint limit = _tokenAmount.mul(_price).div(_userToken.decimals()).div(4);
             // limit has been breached
@@ -560,13 +588,22 @@ contract Vault is IVault, Ownable {
                     limitBreachedTime = i;
                 }
             }
-            feeAccrued = feeAccrued + (_principal + feeAccrued).mul(rate).div(rateDivider);
+            uint feeTemp = (_principal.add(feeAccrued)).mul(rate);
+            feeTemp = feeTemp.div(365).div(rateDivider);
+            feeAccrued += feeTemp;
+
+            feeTemp = (_principal.add(feeAccruedWithoutCoStakers)).mul(rateWithoutCoStakers);
+            feeTemp = feeTemp.div(365).div(rateDivider);
+            feeAccruedWithoutCoStakers += feeTemp;
         }
-        return (feeAccrued, limitBreachedTime);
+        coStakerReward = _coStakerRewardAccrued.add((feeAccruedWithoutCoStakers.sub(feeAccrued)).div(2));
+        return (feeAccrued, coStakerReward, limitBreachedTime);
     }
 
     function _updateDebt() internal {
-        (_feeAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
+        if (_debtUpdateTime == _timeProvider.getTime())
+            return;
+        (_feeAccrued, _coStakerRewardAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
         _debtUpdateTime = _timeProvider.getTime();
     }
 
@@ -576,19 +613,24 @@ contract Vault is IVault, Ownable {
      * @return leftover - amount left after paying in EAU
      */
     function _payOffFees(uint amount) private returns (uint leftover) {
-        uint totalFeesAccrued;
-        uint limitBreachedTime;
-        (totalFeesAccrued, limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
-        _limitBreachedTime = limitBreachedTime;
+        _updateDebt();
+
+        if (_feeAccrued == 0)
+            return amount;
+
         uint feesPaid = 0;
         leftover = amount;
-        if (leftover > totalFeesAccrued) {
-            feesPaid = totalFeesAccrued;
-            leftover = leftover - totalFeesAccrued;
+        if (leftover > _feeAccrued + _coStakerRewardAccrued - _coStakerRewardStash) {
+            feesPaid = _feeAccrued;
+            leftover = leftover - _feeAccrued - _coStakerRewardAccrued + _coStakerRewardStash;
+            _coStakerRewardStash = _coStakerRewardAccrued;
             _feeAccrued = 0;
         } else {
-            feesPaid = leftover;
-            _feeAccrued = totalFeesAccrued - leftover;
+            feesPaid = leftover.mul(_feeAccrued).div(_feeAccrued + _coStakerRewardAccrued - _coStakerRewardStash);
+            leftover -= feesPaid;
+            // co-staker reward
+            _feeAccrued -= feesPaid;
+            _coStakerRewardStash += leftover;
             leftover = 0;
         }
         _totalFeesRepaid += feesPaid;
@@ -598,9 +640,8 @@ contract Vault is IVault, Ownable {
     }
 
     function _distributeFee(uint amount) private {
-        uint toBuyClgn = amount.div(2);
-
         // 50% to buy and burn CLGN
+        uint toBuyClgn = amount.div(2);
         uint clgnBought = _buyClgnForEau(toBuyClgn);
         _clgnToken.burn(clgnBought);
 

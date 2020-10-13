@@ -42,18 +42,28 @@ interface IVault {
     function getStake(address account) external view returns (uint);
 
     /**
-     * Get reward for stake
-     * The vault owner will get nothing
-     * The stakeholder will receive reward as 50% of fees saved
+     * Get reward for stake to be paid off
+     * The vault owner receives no reward for staking
+     * The co-stakeholder receives reward as 50% of fees saved
      */
-    function getStakeReward() external view returns (uint);
+    function getStakeRewardAccrued(address stakeholder) external view returns (uint);
 
     /**
-     * Withdraw reward for stake
-     * The vault owner will get nothing
-     * The stakeholder will receive reward as 50% of fees saved
+     * Get total stake reward to pay off
      */
-    function withdrawStakeReward() external returns (uint);
+    function getStakeRewardAccrued() external view returns (uint);
+
+    /**
+     * Get stake reward ready to claim
+     */
+    function getStakeRewardToClaim(address stakeholder) external view returns (uint);
+
+        /**
+         * Withdraw reward for stake
+         * The vault owner will get nothing
+         * The stakeholder will receive reward as 50% of fees saved
+         */
+    function claimStakeReward(address stakeholder) external returns (uint);
 
     /**
      * Withdraws stake

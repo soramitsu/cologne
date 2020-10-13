@@ -176,8 +176,7 @@ class VaultTest : AcceptanceTest() {
 
         ownerPaysOff(toPayOff)
 
-        val newDebt = vaultByOwner.getTotalDebt().send()
-        assertEquals(debtBefore.minus(toPayOff), newDebt)
+        assertEquals(debtBefore.minus(toPayOff), vaultByOwner.getTotalDebt().send())
         assertEquals(initialEauSupply.minus(toPayOff), eauToken.totalSupply().send())
         assertEquals(balanceBefore.minus(toPayOff), eauToken.balanceOf(owner.address).send())
     }
