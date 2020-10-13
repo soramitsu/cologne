@@ -13,19 +13,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 @Testcontainers
 class ChallengeAcceptanceTest : AcceptanceTest() {
 
-    fun startInitialAuction() {
-        assertEquals(VaultState.Trading.toBigInteger(), vaultByOwner.state.send())
-
-        // breach limit
-        val toBorrow = vaultByOwner.canBorrow().send()
-        vaultByOwner.borrow(toBorrow).send()
-        assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
-
-        // start Initial Liquidity Auction
-        vaultByInitiator.startInitialLiquidityAuction().send()
-        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
-    }
-
     fun challenge(caller: Credentials, price: BigInteger, eauToLock: BigInteger) {
         helper.addAndApproveEAU(caller, vaultByOwner.contractAddress, eauToLock)
         val vaultByCaller = Vault.load(vaultByOwner.contractAddress, helper.web3, caller, helper.gasProvider)
@@ -56,6 +43,7 @@ class ChallengeAcceptanceTest : AcceptanceTest() {
     fun initialLiquidityAuctionIsOver() {
         ownerCreatesVault()
         val challenger = helper.credentialsCharlie
+        ownerBreachesVault()
         startInitialAuction()
         failInitialAuction()
         assertEquals(VaultState.WaitingForSlashing.toBigInteger(), vaultByOwner.state.send())
@@ -203,6 +191,7 @@ class ChallengeAcceptanceTest : AcceptanceTest() {
         assertEquals(toTokenAmount(1550), redeemable.component1())
         assertEquals(BigInteger.ZERO, redeemable.component2())
 
+        ownerBreachesVault()
         startInitialAuction()
         failInitialAuction()
         assertEquals(VaultState.SoldOut.toBigInteger(), vaultByOwner.state.send())

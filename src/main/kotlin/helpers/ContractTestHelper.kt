@@ -150,7 +150,7 @@ class ContractTestHelper(host: String, port: Int) {
         val tkns = userToken.balanceOf(account).send()
         val eaus = eauToken.balanceOf(account).send()
         val clgns = clgnToken.balanceOf(account).send()
-        return Triple(tkns, eaus, clgns);
+        return Triple(tkns, eaus, clgns)
     }
 
     companion object {

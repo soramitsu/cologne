@@ -35,8 +35,8 @@ class VaultTest : AcceptanceTest() {
     /**
      * @given Vault deployed and has user tokens, CLGN and EAU and has no debt
      * @when the owner closes vault
-     * @then all assets (user tokens left in vault, EAU and CLGN stake and CLGN assets transferred from the vault to the
-     * owner, vault is closed
+     * @then all assets (user tokens left in vault, EAU and CLGN staked by the owner transferred
+     * from the vault to the owner, vault is closed
      */
     @Test
     fun closeNoDebt() {
@@ -44,8 +44,6 @@ class VaultTest : AcceptanceTest() {
         ownerCreatesVault(initialAmount, tokenPrice)
         val eauBalance = toTokenAmount(123)
         helper.addEAU(vaultByOwner.contractAddress, eauBalance)
-        val clgnBalance = toTokenAmount(234)
-        helper.addCLGN(vaultByOwner.contractAddress, clgnBalance)
         ownerStake(stake)
 
         vaultByOwner.close().send()
@@ -53,7 +51,7 @@ class VaultTest : AcceptanceTest() {
         assertEquals(VaultState.Closed.toBigInteger(), vaultByOwner.state.send())
         assertEquals(initialAmount, userToken.balanceOf(owner.address).send())
         assertEquals(eauBalance, eauToken.balanceOf(owner.address).send())
-        assertEquals(clgnBalance.add(stake), clgnToken.balanceOf(owner.address).send())
+        assertEquals(stake, clgnToken.balanceOf(owner.address).send())
         assertEquals(BigInteger.ZERO, vaultByOwner.totalDebt.send())
     }
 
