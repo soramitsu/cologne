@@ -4,10 +4,10 @@ pragma solidity ^0.7.0;
 
 import "./../market/IMarketAdaptor.sol";
 
-interface IMedleyDAO {
+interface ICologneDAO {
     /**
      * Create vault and transfer tokens.
-     * Transfer should be allowed to MedleyDAO contract
+     * Transfer should be allowed to CologneDAO contract
      * @param token - user token address
      * @param initialAmount - user token amount
      * @param tokenPrice - price of one user token in EAU

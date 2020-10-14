@@ -12,7 +12,7 @@ import java.math.BigInteger
 class VaultTest : AcceptanceTest() {
 
     /**
-     * @given MedleyDAO deployed and no vaults created and user has 100 UserTokens
+     * @given CologneDAO deployed and no vaults created and user has 100 UserTokens
      * @when create vault called with 100 UserTokens by owner and declare price as 2 EAU/Token
      * @then new vault created and vault owner is caller and 100 UserTokens transferred to the vault and credit limit is
      * 25% of assessed value (100 TKN * 2 EAU / 4 = 50 EAU)
@@ -89,7 +89,7 @@ class VaultTest : AcceptanceTest() {
     }
 
     /**
-     * @given MedleyDAO deployed owner can borrow 50 EAU
+     * @given CologneDAO deployed owner can borrow 50 EAU
      * @when the owner borrows 50 EAU
      * @then EAU tokens are minted to the owner account, owner debt is 50 EAU
      */
@@ -126,7 +126,7 @@ class VaultTest : AcceptanceTest() {
     }
 
     /**
-     * @given MedleyDAO deployed owner has borrowed all limit
+     * @given CologneDAO deployed owner has borrowed all limit
      * @when the owner borrows 50 EAU more
      * @then Error returned - credit limit exhausted
      */

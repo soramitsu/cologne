@@ -34,7 +34,7 @@ class InfiniteTest {
     @Test
     @Disabled
     fun infiniteRun() {
-        println("MedleyDAO address: " + helper.medleyDAO.contractAddress)
+        println("CologneDAO address: " + helper.cologneDAO.contractAddress)
         println("User token address: " + helper.userToken.contractAddress)
         println("MockTime address: " + helper.timeProvider.contractAddress)
         Thread.sleep(Long.MAX_VALUE)

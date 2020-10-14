@@ -1,5 +1,4 @@
-import contract.MedleyDAO
-import contract.Vault
+import contract.CologneDAO
 import helpers.ContractTestHelper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -12,7 +11,7 @@ import java.math.BigInteger
 import java.nio.file.Path
 
 @Testcontainers
-class MedleyDaoTest {
+class CologneDaoTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
@@ -23,26 +22,26 @@ class MedleyDaoTest {
             .withExposedPorts(8545)
 
     lateinit var helper: ContractTestHelper
-    lateinit var medleyDAO: MedleyDAO
+    lateinit var cologneDAO: CologneDAO
 
     @BeforeEach
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
-        medleyDAO = helper.medleyDAO
+        cologneDAO = helper.cologneDAO
     }
 
     /**
-     * @given MedleyDAO deployed and no vaults created
+     * @given CologneDAO deployed and no vaults created
      * @when create vault called by the User
-     * @then new vault created and stored in MedleyDAO vault list
+     * @then new vault created and stored in CologneDAO vault list
      */
     @Test
     fun createVault() {
-        assertEquals(0, medleyDAO.listVaults().send().size)
+        assertEquals(0, cologneDAO.listVaults().send().size)
 
         val vault = helper.createVault(helper.credentialsAlice, BigInteger.ZERO, BigInteger.ZERO)
 
-        val vaults = medleyDAO.listVaults().send()
+        val vaults = cologneDAO.listVaults().send()
         assertEquals(1, vaults.size)
         assertEquals(vault, vaults.last())
     }

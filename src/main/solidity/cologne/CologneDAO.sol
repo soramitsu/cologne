@@ -2,7 +2,7 @@
 
 pragma solidity ^0.7.0;
 
-import "./IMedleyDAO.sol";
+import "./ICologneDAO.sol";
 import "./Vault.sol";
 import "./../token/ERC20/IUserToken.sol";
 import "./../token/ERC20/IEAUToken.sol";
@@ -10,7 +10,7 @@ import "./../token/ERC20/ICLGNToken.sol";
 import "./../market/IMarketAdaptor.sol";
 import "./ITimeProvider.sol";
 
-contract MedleyDAO is IMedleyDAO {
+contract CologneDAO is ICologneDAO {
     address[] _vaults;
     // to check if address is registered vault
     mapping(address => bool) _isVault;
@@ -32,7 +32,7 @@ contract MedleyDAO is IMedleyDAO {
     function createVault(address token, uint initialAmount, uint tokenPrice) external override returns (address) {
         address vault = address(new Vault(msg.sender, token, initialAmount, tokenPrice, _timeProvider));
         IUserToken tokenContract = IUserToken(token);
-        require(tokenContract.transferFrom(msg.sender, vault, initialAmount), "MedleyDAO: Transfer of user tokens not allowed");
+        require(tokenContract.transferFrom(msg.sender, vault, initialAmount), "CologneDAO: Transfer of user tokens not allowed");
         _vaults.push(vault);
         _isVault[vault] = true;
         emit VaultCreation(vault, msg.sender);

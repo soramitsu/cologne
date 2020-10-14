@@ -6,7 +6,7 @@ import "./../token/ERC20/SafeERC20.sol";
 import "./../token/ERC20/IEAUToken.sol";
 import "./../token/ERC20/ICLGNToken.sol";
 import "./IVault.sol";
-import "./IMedleyDAO.sol";
+import "./ICologneDAO.sol";
 import "./../math/SafeMath.sol";
 import "./../math/Math.sol";
 import "./ITimeProvider.sol";
@@ -19,7 +19,7 @@ contract Vault is IVault, Ownable {
     using SafeERC20 for IEAUToken;
     using SafeERC20 for ICLGNToken;
 
-    IMedleyDAO _medleyDao;
+    ICologneDAO _cologneDao;
 
     IEAUToken _eauToken;
     ICLGNToken _clgnToken;
@@ -118,9 +118,9 @@ contract Vault is IVault, Ownable {
         uint initialAmount,
         uint tokenPrice,
         ITimeProvider timeProvider) Ownable(owner) {
-        _medleyDao = IMedleyDAO(msg.sender);
-        _eauToken = IEAUToken(_medleyDao.getEauTokenAddress());
-        _clgnToken = ICLGNToken(_medleyDao.getClgnTokenAddress());
+        _cologneDao = ICologneDAO(msg.sender);
+        _eauToken = IEAUToken(_cologneDao.getEauTokenAddress());
+        _clgnToken = ICLGNToken(_cologneDao.getClgnTokenAddress());
         _userToken = IUserToken(token);
         _tokenAmount = initialAmount;
         _price = tokenPrice;
@@ -233,7 +233,7 @@ contract Vault is IVault, Ownable {
     function borrow(uint amount) notClosed notSlashed onlyOwner public override {
         require(amount <= canBorrow(), "Credit limit is exhausted ");
 
-        _medleyDao.mintEAU(owner(), amount);
+        _cologneDao.mintEAU(owner(), amount);
         _principal += amount;
 
         _updateDebt();
@@ -345,7 +345,7 @@ contract Vault is IVault, Ownable {
 
         uint bounty = debt.div(10);
         uint clgnToMint = _getClgnInForEauOut(debt.add(bounty));
-        _medleyDao.mintCLGN(address(this), clgnToMint);
+        _cologneDao.mintCLGN(address(this), clgnToMint);
         _sellClgnForEau(clgnToMint, debt.add(bounty));
         _eauToken.burn(debt);
         _principal = 0;
@@ -657,7 +657,7 @@ contract Vault is IVault, Ownable {
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
         path[1] = address(_eauToken);
-        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsOut(clgnInAmount, path);
+        uint[] memory amounts = _cologneDao.getClgnMarket().getAmountsOut(clgnInAmount, path);
         return amounts[1];
     }
 
@@ -669,7 +669,7 @@ contract Vault is IVault, Ownable {
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
         path[1] = address(_eauToken);
-        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsIn(eauOutAmount, path);
+        uint[] memory amounts = _cologneDao.getClgnMarket().getAmountsIn(eauOutAmount, path);
         return amounts[0];
     }
 
@@ -680,7 +680,7 @@ contract Vault is IVault, Ownable {
      */
     function _buyClgnForEau(uint eauAmount) private returns (uint bought) {
         if (eauAmount == 0) return 0;
-        _eauToken.safeApprove(address(_medleyDao.getClgnMarket()), eauAmount);
+        _eauToken.safeApprove(address(_cologneDao.getClgnMarket()), eauAmount);
 
         address[] memory path = new address[](2);
         path[0] = address(_eauToken);
@@ -689,7 +689,7 @@ contract Vault is IVault, Ownable {
         // deadline is 1h
         uint deadline = block.timestamp + 3600;
 
-        uint[] memory amounts = _medleyDao.getClgnMarket().swapExactTokensForTokens(eauAmount, 0, path, address(this), deadline);
+        uint[] memory amounts = _cologneDao.getClgnMarket().swapExactTokensForTokens(eauAmount, 0, path, address(this), deadline);
         bought = amounts[1];
         require(eauAmount == amounts[0], "Vault::buyCLGN(): not exact amount of EAU sold to buy CLGN");
         return bought;
@@ -700,7 +700,7 @@ contract Vault is IVault, Ownable {
      */
     function _sellClgnForEau(uint maxClgnAmount, uint exactEauAmount) private returns (uint bought) {
         if (maxClgnAmount == 0 || exactEauAmount == 0) return 0;
-        _clgnToken.safeApprove(address(_medleyDao.getClgnMarket()), maxClgnAmount);
+        _clgnToken.safeApprove(address(_cologneDao.getClgnMarket()), maxClgnAmount);
 
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
@@ -709,12 +709,12 @@ contract Vault is IVault, Ownable {
         // deadline is 1h
         uint deadline = block.timestamp + 3600;
 
-        uint[] memory amounts = _medleyDao.getClgnMarket().swapTokensForExactTokens(exactEauAmount, maxClgnAmount, path, address(this), deadline);
+        uint[] memory amounts = _cologneDao.getClgnMarket().swapTokensForExactTokens(exactEauAmount, maxClgnAmount, path, address(this), deadline);
         uint sold = amounts[0];
         bought = amounts[1];
         require(sold <= maxClgnAmount, "Vault::sellCLGN(): CLGN sold is more than expected");
         if (sold < maxClgnAmount) {
-            _clgnToken.safeDecreaseAllowance(address(_medleyDao.getClgnMarket()), maxClgnAmount.sub(sold));
+            _clgnToken.safeDecreaseAllowance(address(_cologneDao.getClgnMarket()), maxClgnAmount.sub(sold));
         }
         require(bought == exactEauAmount, "Vault::sellCLGN(): not exact amount of EAU bought for CLGN");
         return bought;
