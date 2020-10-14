@@ -9,7 +9,7 @@ module.exports = {
 
   output: {
     path: path.resolve(__dirname, "..", "public"),
-    publicPath: "/public/",
+    publicPath: "/",
     filename: "[name].js",
     chunkFilename: "[id].chunk.js",
   },

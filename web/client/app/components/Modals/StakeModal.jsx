@@ -32,20 +32,25 @@ export default class StakeModal extends React.Component {
       error: false,
     });
 
-    const clgnTokenAddress = await getCologneDaoContract().getClgnTokenAddress();
+    const clgnContract = getCologneDaoContract();
+    const signer = getSigner();
+
+    const clgnTokenAddress = await clgnContract.getClgnTokenAddress();
 
     const clgnTokenContract = new ethers.Contract(
       clgnTokenAddress,
       tokenAbi,
-      getSigner(),
+      signer
     );
 
-    await clgnTokenContract.approve(
+    let res = await clgnTokenContract.approve(
       vaultContract.address,
       ethers.utils.parseEther(tokenAmount),
     );
 
-    const res = await vaultContract
+    await res.wait(1);
+
+    res = await vaultContract
       .stake(ethers.utils.parseEther(tokenAmount))
       .catch((error) => this.setState({error}));
 
@@ -124,6 +129,7 @@ export default class StakeModal extends React.Component {
             <Message
               error
               header="Something went wrong"
+              style={{wordBreak: "break-all"}}
               content={
                 (error.data && error.data.message) ||
                 (error.message && error.message)

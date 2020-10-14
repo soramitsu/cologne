@@ -5,7 +5,7 @@ import ethers from "ethers";
 import CreateVault from "./CreateVault";
 import VaultDetails from "./VaultDetails";
 import {vaultAbi} from "../common/Abi";
-import {getCologneDaoContract} from "../common/Eth";
+import {getCologneDaoContract, getSigner} from "../common/Eth";
 
 class VaultsList extends React.Component {
   state = {
@@ -26,10 +26,8 @@ class VaultsList extends React.Component {
 
   poll = async () => {
     const contract = getCologneDaoContract();
-    console.log(contract);
 
-
-    const vaults = await getCologneDaoContract().listVaults();
+    const vaults = await contract.listVaults();
 
     const {
       user: {address},
@@ -37,7 +35,7 @@ class VaultsList extends React.Component {
 
     const enrichedVaults = await Promise.all(
       vaults.map(async (vault) => {
-        const vaultContract = new ethers.Contract(vault, vaultAbi, signer);
+        const vaultContract = new ethers.Contract(vault, vaultAbi, getSigner());
 
         const price = ethers.utils.formatEther(await vaultContract.getPrice());
 
@@ -130,16 +128,18 @@ class VaultsList extends React.Component {
           {items.map((item) => (
             <Item key={item.address}>
               <Item.Content>
-                <Item.Header as="a">{item.address}</Item.Header>
+                <Item.Header as="a" style={{color: (item.vaultState === 6) ? "gray" : ""}}>{item.address} {(item.vaultState === 6) ? "(closed)" : ""}</Item.Header>
                 <Item.Meta>
                   Owned by {item.isOwner ? "you" : item.ownerAddress}, contains{" "}
                   {item.tokenAmount} tokens
                 </Item.Meta>
-                <Item.Description
-                  onClick={() => this.toggleExpand(item.address)}
-                >
-                  {expanded[item.address] ? "Hide details" : "Expand details"}
-                </Item.Description>
+                  {
+                      (item.vaultState !== 6) ?  <Item.Description
+                          onClick={() => this.toggleExpand(item.address)}
+                      >
+                          {expanded[item.address] ? "Hide details" : "Expand details"}
+                      </Item.Description> : ""
+                  }
                 {expanded[item.address] && <VaultDetails vault={item} />}
               </Item.Content>
             </Item>
