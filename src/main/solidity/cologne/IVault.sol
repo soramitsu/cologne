@@ -2,7 +2,9 @@
 
 pragma solidity ^0.7.0;
 
-interface IVault {
+import "./../utils/IOwnable.sol";
+
+interface IVault is IOwnable {
 
     /**
      * Types of Vault states
