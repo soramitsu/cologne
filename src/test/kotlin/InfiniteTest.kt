@@ -32,7 +32,7 @@ class InfiniteTest {
      * Run testcontainer and deploy contracts
      */
     @Test
-    @Disabled
+//    @Disabled
     fun infiniteRun() {
         println("CologneDAO address: " + helper.cologneDAO.contractAddress)
         println("User token address: " + helper.userToken.contractAddress)

@@ -128,6 +128,10 @@ contract Vault is IVault, Ownable {
         _debtUpdateTime = _timeProvider.getTime();
     }
 
+    function getTokenAddress() public override view returns (address) {
+        return address(_userToken);
+    }
+
     function stake(uint amount) notClosed public override {
         _stake(amount);
     }
@@ -472,11 +476,11 @@ contract Vault is IVault, Ownable {
         uint currentPrice = getPrice();
         require(price != 0, "Vault:challenge: price cannot be 0");
         require(price < currentPrice, "Vault:challenge: price too high");
-        require(eauToLock >= _tokenAmount.mul(price).div(10 ** _userToken.decimals()), "Vault:challenge: lock amount in EAU not enough");
+        require(eauToLock.add(_challengers[msg.sender].eauAmountToLock) >= _tokenAmount.mul(price).div(10 ** _userToken.decimals()), "Vault:challenge: lock amount in EAU not enough");
         _eauToken.safeTransferFrom(msg.sender, address(this), eauToLock);
         eauForChallengers += eauToLock;
-        Challenge memory newChallenge = Challenge(price, eauToLock);
-        _challengers[msg.sender] = newChallenge;
+        _challengers[msg.sender].price = price;
+        _challengers[msg.sender].eauAmountToLock += eauToLock;
         if (price > _challengers[_challengeWinnerAddress].price) {
             _challengeWinnerAddress = msg.sender;
         }

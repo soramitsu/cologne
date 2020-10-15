@@ -32,10 +32,15 @@ interface IVault is IOwnable {
         SoldOut
     }
 
-        /**
-         * Stake CLGN on Vault
-         * @param amount - amount of attoCLGN to stake
-         */
+    /**
+     * Returns token address
+     */
+    function getTokenAddress() external view returns (address);
+
+    /**
+     * Stake CLGN on Vault
+     * @param amount - amount of attoCLGN to stake
+     */
     function stake(uint amount) external;
 
     /**
@@ -60,11 +65,11 @@ interface IVault is IOwnable {
      */
     function getStakeRewardToClaim(address stakeholder) external view returns (uint);
 
-        /**
-         * Withdraw reward for stake
-         * The vault owner will get nothing
-         * The stakeholder will receive reward as 50% of fees saved
-         */
+    /**
+     * Withdraw reward for stake
+     * The vault owner will get nothing
+     * The stakeholder will receive reward as 50% of fees saved
+     */
     function claimStakeReward(address stakeholder) external returns (uint);
 
     /**
