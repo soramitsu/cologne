@@ -55,6 +55,7 @@ class ChallengeModal extends React.Component {
     const res = await vaultContract
       .challenge(
         ethers.utils.parseEther(price),
+        // price * await vaultContract.getTokenAmount()
         ethers.utils.parseEther(eauToLock),
       )
       .catch((error) => this.setState({error}));
@@ -149,6 +150,7 @@ class ChallengeModal extends React.Component {
             <Message
               error
               header="Something went wrong"
+              style={{wordBreak: "break-all"}}
               content={
                 (error.data && error.data.message) ||
                 (error.message && error.message)

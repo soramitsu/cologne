@@ -6,7 +6,7 @@ import {getTimeProviderContract, getUserTokenContract} from "../common/Eth";
 
 class ServiceActions extends React.Component {
   state = {
-    shown: true,
+    shown: false,
   };
 
   mintUserToken = async () => {

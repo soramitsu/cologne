@@ -24,7 +24,10 @@ export default class StartAuctionModal extends React.Component {
 
     const res = await vaultContract
       .startInitialLiquidityAuction()
-      .catch((error) => this.setState({error}));
+      .catch((error) => {
+        console.log(error);
+        this.setState({error})
+      });
 
     if (res) {
       this.setState({
@@ -61,6 +64,7 @@ export default class StartAuctionModal extends React.Component {
           {error && (
             <Message
               error
+              style={{wordBreak: "break-all"}}
               header="Something went wrong"
               content={
                 (error.data && error.data.message) ||

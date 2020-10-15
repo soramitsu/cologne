@@ -5,14 +5,14 @@ export const ganacheAddresses = {
 };
 
 export const gorliAddresses = {
-  cologneDaoAddress: "0xb34b03cf0930f347529d2b6625f86c34938af807",
-  userTokenAddress: "0xf4547f8481a99a12478301ecba1c68f734d37717",
-  timeProviderAddress: "0x5fa9b8e645cbe2f23bf04b6d18ba66b1452ea3c8",
+  cologneDaoAddress: "0x893ade9859be78ef78fe7f52f63138e3a44bbbea",
+  userTokenAddress: "0x28c3afa4430aed6612083ac28658543dc48bb984",
+  timeProviderAddress: "0xbd25b57e3a95e42b0c8133af4c41a87bba23561d",
 };
 
 export const networkMapper = (chainId) => {
   switch (chainId) {
-    case "0x05":
+    case "0x5":
       return gorliAddresses;
     default:
       return ganacheAddresses;

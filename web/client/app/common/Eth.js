@@ -4,6 +4,8 @@ import {loginUser} from "../redux/actions/User";
 import {changeChain} from "../redux/actions/Chain";
 import {cologneDaoAbi, timeProviderAbi, tokenAbi} from "./Abi";
 import {networkMapper} from "./Constants";
+import detectEthereumProvider from "@metamask/detect-provider";
+import {provider} from "../../App";
 
 // States emitted by Vault translated into string representation
 export const VaultStates = [
@@ -19,25 +21,27 @@ export const VaultStates = [
 
 export const stateFormatter = (state) => VaultStates[state];
 
-// Network changed handler
-window.ethereum.on("chainChanged", (chainId) => {
-  console.log(`Network has changed, new network id: ${chainId}`);
-  store.dispatch(
-    changeChain({
-      id: chainId,
-    }),
-  );
-});
+if (provider) {
+  // Network changed handler
+  window.ethereum.on("chainChanged", (chainId) => {
+    console.log(`Network has changed, new network id: ${chainId}`);
+    store.dispatch(
+        changeChain({
+          id: chainId,
+        }),
+    );
+  });
 
 // Account changed handler
-window.ethereum.on("accountsChanged", (newAccounts) => {
-  console.log(`Account has changed, new account: ${newAccounts[0]}`);
-  store.dispatch(
-    loginUser({
-      address: newAccounts[0],
-    }),
-  );
-});
+  window.ethereum.on("accountsChanged", (newAccounts) => {
+    console.log(`Account has changed, new account: ${newAccounts[0]}`);
+    store.dispatch(
+        loginUser({
+          address: newAccounts[0],
+        }),
+    );
+  });
+}
 
 export const getProvider = () =>
   new ethers.providers.Web3Provider(window.ethereum);
