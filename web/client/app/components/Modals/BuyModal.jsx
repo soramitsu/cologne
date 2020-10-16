@@ -45,8 +45,6 @@ class BuyModal extends React.Component {
       signer,
     );
 
-    console.log((Number.parseFloat(maxPrice) * Number.parseInt(tokenAmount)).toString());
-
     let res = await eauTokenContract.approve(
       vaultContract.address,
       ethers.utils.parseEther(
