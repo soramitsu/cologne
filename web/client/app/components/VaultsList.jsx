@@ -5,7 +5,7 @@ import ethers from "ethers";
 import CreateVault from "./CreateVault";
 import VaultDetails from "./VaultDetails";
 import {vaultAbi} from "../common/Abi";
-import {getCologneDaoContract} from "../common/Eth";
+import {getCologneDaoContract, getSigner} from "../common/Eth";
 
 class VaultsList extends React.Component {
   state = {
@@ -26,7 +26,7 @@ class VaultsList extends React.Component {
 
   poll = async () => {
     const vaults = await getCologneDaoContract().listVaults();
-
+    const signer = getSigner();
     const {
       user: {address},
     } = this.props;
