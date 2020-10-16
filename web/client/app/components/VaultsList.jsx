@@ -25,8 +25,10 @@ class VaultsList extends React.Component {
   }
 
   poll = async () => {
-    const vaults = await getCologneDaoContract().listVaults();
     const signer = getSigner();
+    const contract = getCologneDaoContract();
+    const vaults = await contract.listVaults();
+
     const {
       user: {address},
     } = this.props;
@@ -126,16 +128,25 @@ class VaultsList extends React.Component {
           {items.map((item) => (
             <Item key={item.address}>
               <Item.Content>
-                <Item.Header as="a">{item.address}</Item.Header>
+                <Item.Header
+                  as="a"
+                  style={{color: item.vaultState === 6 ? "gray" : ""}}
+                >
+                  {item.address} {item.vaultState === 6 ? "(closed)" : ""}
+                </Item.Header>
                 <Item.Meta>
                   Owned by {item.isOwner ? "you" : item.ownerAddress}, contains{" "}
                   {item.tokenAmount} tokens
                 </Item.Meta>
-                <Item.Description
-                  onClick={() => this.toggleExpand(item.address)}
-                >
-                  {expanded[item.address] ? "Hide details" : "Expand details"}
-                </Item.Description>
+                {item.vaultState !== 6 ? (
+                  <Item.Description
+                    onClick={() => this.toggleExpand(item.address)}
+                  >
+                    {expanded[item.address] ? "Hide details" : "Expand details"}
+                  </Item.Description>
+                ) : (
+                  ""
+                )}
                 {expanded[item.address] && <VaultDetails vault={item} />}
               </Item.Content>
             </Item>

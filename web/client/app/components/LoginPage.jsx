@@ -27,6 +27,7 @@ export function OnboardingButton() {
 
   React.useEffect(() => {
     if (MetaMaskOnboarding.isMetaMaskInstalled()) {
+      console.log(MetaMaskOnboarding.isMetaMaskInstalled());
       if (accounts.length > 0) {
         setVisibility(false);
         onboarding.current.stopOnboarding();

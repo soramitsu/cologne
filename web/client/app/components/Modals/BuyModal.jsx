@@ -1,4 +1,4 @@
-import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
+import {Button, Modal, Dropdown, Form, Message, Loader, Dimmer} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
@@ -27,33 +27,46 @@ class BuyModal extends React.Component {
     const {tokenAmount, maxPrice} = values;
     const {
       item: {vaultContract},
-      user: {account},
+      user: {address},
     } = this.props;
 
     this.setState({
       error: false,
     });
 
-    const eauTokenAddress = await getCologneDaoContract().getEauTokenAddress();
+    const clgnContract = getCologneDaoContract();
+    const signer = getSigner();
+
+    const eauTokenAddress = await clgnContract.getEauTokenAddress();
 
     const eauTokenContract = new ethers.Contract(
       eauTokenAddress,
       tokenAbi,
-      getSigner(),
+      signer,
     );
 
-    await eauTokenContract.approve(
+    let res = await eauTokenContract.approve(
       vaultContract.address,
       ethers.utils.parseEther(
         (Number.parseFloat(maxPrice) * Number.parseInt(tokenAmount)).toString(),
       ),
     );
 
-    const res = await vaultContract
+    this.setState({
+      loading: true
+    });
+
+    await res.wait(1);
+
+    this.setState({
+      loading: false
+    });
+
+    res = await vaultContract
       .buy(
         ethers.utils.parseEther(tokenAmount),
         ethers.utils.parseEther(maxPrice),
-        account,
+        address,
       )
       .catch((error) => this.setState({error}));
 
@@ -61,6 +74,7 @@ class BuyModal extends React.Component {
       this.setState({
         open: false,
         error: false,
+        loading: false
       });
     }
   };
@@ -87,7 +101,7 @@ class BuyModal extends React.Component {
   };
 
   render() {
-    const {open, error} = this.state;
+    const {open, error, loading} = this.state;
 
     return (
       <Modal
@@ -97,6 +111,12 @@ class BuyModal extends React.Component {
         open={open}
         trigger={<Dropdown.Item>Buy</Dropdown.Item>}
       >
+        {
+          loading ? <Dimmer active inverted>
+            <Loader>Approving spending...</Loader>
+          </Dimmer> : ""
+        }
+
         <Modal.Header>Buy tokens from the contract</Modal.Header>
         <Modal.Content>
           <Formik
@@ -151,6 +171,7 @@ class BuyModal extends React.Component {
             <Message
               error
               header="Something went wrong"
+              style={{wordBreak: "break-all"}}
               content={
                 (error.data && error.data.message) ||
                 (error.message && error.message)

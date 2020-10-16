@@ -1,16 +1,19 @@
 import ethers from "ethers";
 import React from "react";
 import {Button, Container, Form, Message} from "semantic-ui-react";
-import {ganacheAddresses} from "../common/Constants";
-import {getCologneDaoContract, getUserTokenContract} from "../common/Eth";
+import {ganacheAddresses, networkMapper} from "../common/Constants";
+import {getCologneDaoContract, getSigner, getUserTokenContract} from "../common/Eth";
+import {connect} from "react-redux";
+import {tokenAbi} from "../common/Abi";
 
-export default class CreateVault extends React.Component {
+class CreateVault extends React.Component {
   state = {
     tokenAddress: "",
     vaultValue: "",
     tokenAmount: "",
     isCreating: false,
     error: false,
+    loading: false,
   };
 
   handleChange = (e, {name, value}) => {
@@ -19,19 +22,31 @@ export default class CreateVault extends React.Component {
 
   handleSubmit = async () => {
     const {tokenAddress, vaultValue, tokenAmount} = this.state;
+    const {chain} = this.props;
+
+    const clgnContract = getCologneDaoContract();
+    const signer = getSigner();
+
+    const tokenContract =  new ethers.Contract(
+        tokenAddress,
+        tokenAbi,
+        signer
+    );
 
     this.setState({
-      error: false,
+      loading: true,
     });
 
     // approve tx should be sent first for user token contract
-    await getUserTokenContract().approve(
-      ganacheAddresses.cologneDaoAddress,
+    let res = await tokenContract.approve(
+      networkMapper(chain.id).cologneDaoAddress,
       ethers.utils.parseEther(tokenAmount),
     );
 
+    await res.wait(1);
+
     // create vault itself
-    const res = await getCologneDaoContract()
+    res = await clgnContract
       .createVault(
         tokenAddress,
         ethers.utils.parseEther(tokenAmount),
@@ -40,6 +55,10 @@ export default class CreateVault extends React.Component {
       .catch((error) => {
         this.setState({error});
       });
+
+    this.setState({
+      loading: false,
+    });
 
     if (res) {
       this.setState({
@@ -55,7 +74,10 @@ export default class CreateVault extends React.Component {
       tokenAddress,
       tokenAmount,
       error,
+      loading
     } = this.state;
+
+    console.log(loading);
 
     return (
       <Container style={{marginTop: "1em"}}>
@@ -106,6 +128,7 @@ export default class CreateVault extends React.Component {
               <Message
                 error
                 header="Something went wrong"
+                style={{wordBreak: "break-all"}}
                 content={
                   (error.data && error.data.message) ||
                   (error.message && error.message)
@@ -113,10 +136,17 @@ export default class CreateVault extends React.Component {
               />
             )}
 
-            <Button type="submit">Create</Button>
+            {loading ? <Button loading type="submit">Create</Button> : <Button type="submit">Create</Button>}
+
           </Form>
         )}
       </Container>
     );
   }
 }
+
+const mapStateToProps = (state) => ({
+  chain: state.chain,
+});
+
+export default connect(mapStateToProps)(CreateVault);

@@ -42,7 +42,7 @@ class ContractTestHelper(host: String, port: Int) {
     val eauToken: EAUToken
     val userToken: UserToken
     val marketAdaptor: MarketAdaptorMock
-    val medleyDAO: MedleyDAO
+    val cologneDAO: CologneDAO
     lateinit var vaultByOwner: Vault
     val timeProvider: TimeProviderMock
 
@@ -63,7 +63,7 @@ class ContractTestHelper(host: String, port: Int) {
                 eauToken.contractAddress
             ).send()
         timeProvider = TimeProviderMock.deploy(web3, credentialsSeed, gasProvider).send()
-        medleyDAO = MedleyDAO.deploy(
+        cologneDAO = CologneDAO.deploy(
             web3,
             credentialsSeed,
             gasProvider,
@@ -72,10 +72,10 @@ class ContractTestHelper(host: String, port: Int) {
             marketAdaptor.contractAddress,
             timeProvider.contractAddress
         ).send()
-        clgnToken.transferOwnership(medleyDAO.contractAddress).send()
+        clgnToken.transferOwnership(cologneDAO.contractAddress).send()
         // some EAU for tests
         eauToken.mint(credentialsSeed.address, toTokenAmount(100_000_000)).send()
-        eauToken.transferOwnership(medleyDAO.contractAddress).send()
+        eauToken.transferOwnership(cologneDAO.contractAddress).send()
 
         // add liquidity to market
         eauToken.transfer(marketAdaptor.contractAddress, toTokenAmount(1_000_000)).send()
@@ -111,12 +111,12 @@ class ContractTestHelper(host: String, port: Int) {
         userToken.mint(owner.address, userTokenAmount).send()
         // User token by credentials
         val tokenByOwner = UserToken.load(userToken.contractAddress, web3, owner, gasProvider)
-        tokenByOwner.approve(medleyDAO.contractAddress, userTokenAmount).send()
+        tokenByOwner.approve(cologneDAO.contractAddress, userTokenAmount).send()
 
-        val medleyDaoByOwner = MedleyDAO.load(medleyDAO.contractAddress, web3, owner, gasProvider)
+        val cologneDaoByOwner = CologneDAO.load(cologneDAO.contractAddress, web3, owner, gasProvider)
         val tx =
-            medleyDaoByOwner.createVault(userToken.contractAddress, userTokenAmount, userTokenPrice).send()
-        val vaultAddress = medleyDaoByOwner.getVaultCreationEvents(tx).last().vault
+            cologneDaoByOwner.createVault(userToken.contractAddress, userTokenAmount, userTokenPrice).send()
+        val vaultAddress = cologneDaoByOwner.getVaultCreationEvents(tx).last().vault
 
         vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
 
@@ -126,7 +126,7 @@ class ContractTestHelper(host: String, port: Int) {
     fun stake(vaultAddress: String, owner: Credentials, amount: BigInteger) {
         clgnToken.transfer(owner.address, amount).send()
         val clgnTokenByOwner = UserToken.load(clgnToken.contractAddress, web3, owner, gasProvider)
-        clgnTokenByOwner.approve(medleyDAO.contractAddress, amount).send()
+        clgnTokenByOwner.approve(cologneDAO.contractAddress, amount).send()
         vaultByOwner = Vault.load(vaultAddress, web3, owner, gasProvider)
         vaultByOwner.stake(amount).send()
     }
@@ -150,7 +150,7 @@ class ContractTestHelper(host: String, port: Int) {
         val tkns = userToken.balanceOf(account).send()
         val eaus = eauToken.balanceOf(account).send()
         val clgns = clgnToken.balanceOf(account).send()
-        return Triple(tkns, eaus, clgns);
+        return Triple(tkns, eaus, clgns)
     }
 
     companion object {

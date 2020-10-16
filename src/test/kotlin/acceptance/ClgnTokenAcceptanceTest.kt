@@ -28,14 +28,14 @@ class ClgnTokenAcceptanceTest {
     lateinit var helper: ContractTestHelper
     lateinit var clgnToken: CLGNToken
     lateinit var creator: Credentials
-    lateinit var medleyDaoAddress: String
+    lateinit var cologneDaoAddress: String
 
     @BeforeEach
     fun setUp() {
         helper = ContractTestHelper(ganache.host, ganache.firstMappedPort)
         clgnToken = helper.clgnToken
         creator = helper.credentialsSeed
-        medleyDaoAddress = helper.medleyDAO.contractAddress
+        cologneDaoAddress = helper.cologneDAO.contractAddress
     }
 
     /**
@@ -44,7 +44,7 @@ class ClgnTokenAcceptanceTest {
      * @then has:
      * - intial supply of 22,5 kk on owner
      * - precision is 18
-     * - owner is MedleyDAO
+     * - owner is CologneDAO
      */
     @Test
     fun clgnTokenCreation() {

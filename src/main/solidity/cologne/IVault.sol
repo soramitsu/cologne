@@ -2,7 +2,9 @@
 
 pragma solidity ^0.7.0;
 
-interface IVault {
+import "./../utils/IOwnable.sol";
+
+interface IVault is IOwnable {
 
     /**
      * Types of Vault states
@@ -31,10 +33,50 @@ interface IVault {
     }
 
     /**
+     * Returns token address
+     */
+    function getTokenAddress() external view returns (address);
+
+    /**
      * Stake CLGN on Vault
      * @param amount - amount of attoCLGN to stake
      */
     function stake(uint amount) external;
+
+    /**
+     * Get stake of a user in CLGN
+     */
+    function getStake(address account) external view returns (uint);
+
+    /**
+     * Get reward for stake to be paid off
+     * The vault owner receives no reward for staking
+     * The co-stakeholder receives reward as 50% of fees saved
+     */
+    function getStakeRewardAccrued(address stakeholder) external view returns (uint);
+
+    /**
+     * Get total stake reward to pay off
+     */
+    function getStakeRewardAccrued() external view returns (uint);
+
+    /**
+     * Get stake reward ready to claim
+     */
+    function getStakeRewardToClaim(address stakeholder) external view returns (uint);
+
+    /**
+     * Withdraw reward for stake
+     * The vault owner will get nothing
+     * The stakeholder will receive reward as 50% of fees saved
+     */
+    function claimStakeReward(address stakeholder) external returns (uint);
+
+    /**
+     * Withdraws stake
+     * Can be called only after the vault is closed.
+     */
+    function withdrawStake() external returns (uint);
 
     /**
      * @param amount of tokens to buy on atomic smallest part of token (e.g. 10^-18)

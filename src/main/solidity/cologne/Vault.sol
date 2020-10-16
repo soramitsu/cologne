@@ -6,7 +6,7 @@ import "./../token/ERC20/SafeERC20.sol";
 import "./../token/ERC20/IEAUToken.sol";
 import "./../token/ERC20/ICLGNToken.sol";
 import "./IVault.sol";
-import "./IMedleyDAO.sol";
+import "./ICologneDAO.sol";
 import "./../math/SafeMath.sol";
 import "./../math/Math.sol";
 import "./ITimeProvider.sol";
@@ -19,7 +19,7 @@ contract Vault is IVault, Ownable {
     using SafeERC20 for IEAUToken;
     using SafeERC20 for ICLGNToken;
 
-    IMedleyDAO _medleyDao;
+    ICologneDAO _cologneDao;
 
     IEAUToken _eauToken;
     ICLGNToken _clgnToken;
@@ -33,13 +33,26 @@ contract Vault is IVault, Ownable {
     // Owner token price assessed by the owner in attoEAU (10^-18 EAU for 1 UserToken)
     uint _price = 0;
 
-    // Value of CLGN collateral in EAU
-    uint _collateral;
+    // current amount of stake (including slashing)
+    uint _stakeCurrent;
+
+    // stake deposited (wo slashing)
+    uint _stakedTotal;
+
+    // (address => stake) staked total by user
+    // actual stake by user = staked by user * _stakeCurrent / _stakedTotal
+    mapping(address => uint) _stakeByUser;
+    mapping(address => uint) _stakeRewardClaimedByUser;
 
     // Initial amount of loan without fees
     uint _principal = 0;
 
     uint _feeAccrued = 0;
+
+    // 50% of fees saved goes to co-stakeholders
+    uint _coStakerRewardAccrued = 0;
+
+    uint _coStakerRewardStash = 0;
 
     uint _debtUpdateTime;
 
@@ -79,6 +92,11 @@ contract Vault is IVault, Ownable {
         _;
     }
 
+    modifier closed {
+        require(_closed, "Vault is not closed");
+        _;
+    }
+
     modifier notClosed {
         require(!_closed, "Vault is closed");
         _;
@@ -100,9 +118,9 @@ contract Vault is IVault, Ownable {
         uint initialAmount,
         uint tokenPrice,
         ITimeProvider timeProvider) Ownable(owner) {
-        _medleyDao = IMedleyDAO(msg.sender);
-        _eauToken = IEAUToken(_medleyDao.getEauTokenAddress());
-        _clgnToken = ICLGNToken(_medleyDao.getClgnTokenAddress());
+        _cologneDao = ICologneDAO(msg.sender);
+        _eauToken = IEAUToken(_cologneDao.getEauTokenAddress());
+        _clgnToken = ICLGNToken(_cologneDao.getClgnTokenAddress());
         _userToken = IUserToken(token);
         _tokenAmount = initialAmount;
         _price = tokenPrice;
@@ -110,8 +128,67 @@ contract Vault is IVault, Ownable {
         _debtUpdateTime = _timeProvider.getTime();
     }
 
+    function getTokenAddress() public override view returns (address) {
+        return address(_userToken);
+    }
+
     function stake(uint amount) notClosed public override {
         _stake(amount);
+    }
+
+    // @dev See {IVault-getStake}
+    function getStake(address account) public override view returns (uint) {
+        if (_stakedTotal == 0) return 0;
+        return _stakeByUser[account].mul(_stakeCurrent).div(_stakedTotal);
+    }
+
+    // @dev See {IVault-getStakeReward}
+    function getStakeRewardAccrued(address stakeholder) public override view returns (uint) {
+        if (stakeholder == owner()) return 0;
+
+        uint totalReward;
+        (, totalReward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        if (_stakeByUser[owner()] == _stakedTotal) return 0;
+        return totalReward.mul(_stakeByUser[stakeholder]).div(_stakedTotal.sub(_stakeByUser[owner()]));
+    }
+
+    function getStakeRewardAccrued() public override view returns (uint reward) {
+        (, reward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        return reward;
+    }
+
+    function getStakeRewardToClaim(address stakeholder) public override view returns (uint reward) {
+        uint totalReward;
+        (, totalReward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        if (totalReward == 0)
+            return 0;
+
+        if (stakeholder == owner()) return 0;
+        if (_stakeByUser[owner()] == _stakedTotal) return 0;
+
+        return _coStakerRewardStash.mul(_stakeByUser[stakeholder]).div(_stakedTotal.sub(_stakeByUser[owner()])).sub(_stakeRewardClaimedByUser[stakeholder]);
+    }
+
+    // @dev See {IVault-withdrawStakeReward}
+    function claimStakeReward(address stakeholder) public override returns (uint) {
+        _updateDebt();
+
+        if (msg.sender == owner()) return 0;
+
+        uint reward = getStakeRewardToClaim(stakeholder);
+        _eauToken.safeTransfer(stakeholder, reward);
+        _stakeRewardClaimedByUser[stakeholder] = reward;
+        return reward;
+    }
+
+    // @dev See {IVault-withdrawStake}
+    function withdrawStake() closed public override returns (uint) {
+        uint toWithdraw = getStake(msg.sender);
+        if (toWithdraw != 0) {
+            _clgnToken.safeTransfer(msg.sender, toWithdraw);
+        }
+        _stakeByUser[msg.sender] = 0;
+        return toWithdraw;
     }
 
     // @dev See {IVault-buy}
@@ -160,7 +237,7 @@ contract Vault is IVault, Ownable {
     function borrow(uint amount) notClosed notSlashed onlyOwner public override {
         require(amount <= canBorrow(), "Credit limit is exhausted ");
 
-        _medleyDao.mintEAU(owner(), amount);
+        _cologneDao.mintEAU(owner(), amount);
         _principal += amount;
 
         _updateDebt();
@@ -193,20 +270,16 @@ contract Vault is IVault, Ownable {
             _closeOutTime = 0;
         }
 
-        uint price = getPrice();
-        if (_price != price)
-            _price = price;
-
-        _debtUpdateTime = _timeProvider.getTime();
+        _price = getPrice();
     }
 
     function close() onlyOwner public override {
-        require(_getTotalDebt(_timeProvider.getTime()) == 0, "Vault::close(): close allowed only if debt is paid off");
+        require(getTotalDebt() == 0, "Vault::close(): close allowed only if debt is paid off");
+        _closed = true;
         _userToken.safeTransfer(owner(), _userToken.balanceOf(address(this)));
         _tokenAmount = 0;
-        _clgnToken.safeTransfer(owner(), _clgnToken.balanceOf(address(this)));
         _eauToken.safeTransfer(owner(), _eauToken.balanceOf(address(this)).sub(eauForChallengers));
-        _closed = true;
+        withdrawStake();
     }
 
     function startInitialLiquidityAuction() notClosed notSlashed public override {
@@ -223,8 +296,8 @@ contract Vault is IVault, Ownable {
         // determine amount CLGN to sell
         uint debt = getTotalDebt();
         uint clgnToSell = _getClgnInForEauOut(debt);
-        if (clgnToSell > _collateral)
-            clgnToSell = _collateral;
+        if (clgnToSell > _stakeCurrent)
+            clgnToSell = _stakeCurrent;
 
         // distribute penalty
         uint penalty = clgnToSell.div(10);
@@ -235,16 +308,16 @@ contract Vault is IVault, Ownable {
         _clgnToken.safeTransfer(msg.sender, part);
         // remaining to burn
         _clgnToken.burn(penalty.sub(part.mul(2)));
-        _collateral -= penalty;
+        _stakeCurrent -= penalty;
 
         // sell staked CLGN for EAU
-        if (clgnToSell > _collateral)
-            clgnToSell = _collateral;
+        if (clgnToSell > _stakeCurrent)
+            clgnToSell = _stakeCurrent;
         uint eauToBuy = _getEauOutForClgnIn(clgnToSell);
         if (eauToBuy > debt)
             eauToBuy = debt;
         uint eauLeftover = _sellClgnForEau(clgnToSell, eauToBuy);
-        _collateral -= clgnToSell;
+        _stakeCurrent -= clgnToSell;
 
         // pay off principal
         if (_principal <= eauLeftover) {
@@ -258,11 +331,12 @@ contract Vault is IVault, Ownable {
         }
 
         // pay off fees accrued
-        require(eauLeftover <= _feeAccrued, "Slashing: Too many EAU got from slashing");
-        _distributeFee(eauLeftover);
+        require(eauLeftover <= _feeAccrued + _coStakerRewardAccrued, "Slashing: Too many EAU got from slashing");
+        _payOffFees(eauLeftover);
 
         // forgive fees
         _feeAccrued = 0;
+        //        _coStakerRewardAccrued = 0;
         _slashed = true;
     }
 
@@ -275,7 +349,7 @@ contract Vault is IVault, Ownable {
 
         uint bounty = debt.div(10);
         uint clgnToMint = _getClgnInForEauOut(debt.add(bounty));
-        _medleyDao.mintCLGN(address(this), clgnToMint);
+        _cologneDao.mintCLGN(address(this), clgnToMint);
         _sellClgnForEau(clgnToMint, debt.add(bounty));
         _eauToken.burn(debt);
         _principal = 0;
@@ -285,13 +359,11 @@ contract Vault is IVault, Ownable {
 
 
     function getTotalDebt() public view override returns (uint debt) {
-        return _getTotalDebt(_timeProvider.getTime());
-    }
-
-    function _getTotalDebt(uint time) private view returns (uint debt) {
         if (_closed) return 0;
-        debt = _principal.add(_getFees(time));
-        return debt;
+        uint fees;
+        uint reward;
+        (fees, reward,) = _calculateFeesAccrued(_timeProvider.getTime());
+        return _principal.add(fees).add(reward).sub(_coStakerRewardStash);
     }
 
     function getPrincipal() public view override returns (uint) {
@@ -299,15 +371,15 @@ contract Vault is IVault, Ownable {
         return _principal;
     }
 
-    function getFees() public view override returns (uint) {
-        return _getFees(_timeProvider.getTime());
-    }
-
     function getTotalFeesRepaid() public view override returns (uint) {
         return _totalFeesRepaid;
     }
 
     function getFeeRate() public view override returns (uint) {
+        return _getFeeRate(getCollateralInEau());
+    }
+
+    function _getFeeRate(uint collateral) private view returns (uint) {
         // Initial rate is 101%
         uint feeRate = (101 * 10 ** 18);
 
@@ -316,7 +388,7 @@ contract Vault is IVault, Ownable {
             // 1% if no debt
             feeRate = 10 ** 18;
         } else {
-            uint stakeDiscount = (getCollateralInEau()).mul(100 * 10 ** 18).div(getPrincipal());
+            uint stakeDiscount = collateral.mul(100 * 10 ** 18).div(getPrincipal());
             if (feeRate >= stakeDiscount)
                 feeRate -= stakeDiscount;
             else
@@ -337,9 +409,9 @@ contract Vault is IVault, Ownable {
         return feeRate;
     }
 
-    function _getFees(uint time) private view returns (uint fees) {
+    function getFees() public view override returns (uint fees) {
         if (_closed) return 0;
-        (fees,) = _calculateFeesAccrued(time);
+        (fees, ,) = _calculateFeesAccrued(_timeProvider.getTime());
         return fees;
     }
 
@@ -350,7 +422,7 @@ contract Vault is IVault, Ownable {
     // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
     function canBorrow() public view override returns (uint) {
         if (_closed) return 0;
-        uint debt = _getTotalDebt(_timeProvider.getTime());
+        uint debt = getTotalDebt();
         uint creditLimit = getCreditLimit();
         if (creditLimit <= debt) {
             return 0;
@@ -364,7 +436,7 @@ contract Vault is IVault, Ownable {
      */
     function isLimitBreached() public view returns (bool) {
         if (_closed) return false;
-        return _getTotalDebt(_timeProvider.getTime()) != 0 && canBorrow() == 0;
+        return getTotalDebt() != 0 && canBorrow() == 0;
     }
 
     // @dev See {IVault-getPrice}
@@ -383,7 +455,7 @@ contract Vault is IVault, Ownable {
      * Get CLGN collateral in EAU
      */
     function getCollateralInEau() public view override returns (uint) {
-        return _getEauOutForClgnIn(_collateral);
+        return _getEauOutForClgnIn(_stakeCurrent);
     }
 
     function getState() public view override returns (VaultState) {
@@ -404,11 +476,11 @@ contract Vault is IVault, Ownable {
         uint currentPrice = getPrice();
         require(price != 0, "Vault:challenge: price cannot be 0");
         require(price < currentPrice, "Vault:challenge: price too high");
-        require(eauToLock >= _tokenAmount.mul(price).div(10 ** _userToken.decimals()), "Vault:challenge: lock amount in EAU not enough");
+        require(eauToLock.add(_challengers[msg.sender].eauAmountToLock) >= _tokenAmount.mul(price).div(10 ** _userToken.decimals()), "Vault:challenge: lock amount in EAU not enough");
         _eauToken.safeTransferFrom(msg.sender, address(this), eauToLock);
         eauForChallengers += eauToLock;
-        Challenge memory newChallenge = Challenge(price, eauToLock);
-        _challengers[msg.sender] = newChallenge;
+        _challengers[msg.sender].price = price;
+        _challengers[msg.sender].eauAmountToLock += eauToLock;
         if (price > _challengers[_challengeWinnerAddress].price) {
             _challengeWinnerAddress = msg.sender;
         }
@@ -470,7 +542,9 @@ contract Vault is IVault, Ownable {
     function _stake(uint clgnAmount) private {
         _clgnToken.safeTransferFrom(msg.sender, address(this), clgnAmount);
         _updateDebt();
-        _collateral = _collateral + clgnAmount;
+        _stakeByUser[msg.sender] = _stakeByUser[msg.sender].add(clgnAmount);
+        _stakeCurrent = _stakeCurrent.add(clgnAmount);
+        _stakedTotal = _stakedTotal.add(clgnAmount);
     }
 
     /**
@@ -489,7 +563,10 @@ contract Vault is IVault, Ownable {
         return price;
     }
 
-    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint limitBreachedTime) {
+    /**
+     *
+     */
+    function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint coStakerReward, uint limitBreachedTime) {
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
         uint endTime = time;
         // Stop calculate fee when close-out process started
@@ -501,10 +578,12 @@ contract Vault is IVault, Ownable {
 
         // rate per period multiplied by 10 ** 20
         uint rateDivider = 10 ** 20;
-        uint rate = getFeeRate().div(365);
+        uint rate = _getFeeRate(getCollateralInEau());
+        uint rateWithoutCoStakers = _getFeeRate(_getEauOutForClgnIn(getStake(owner())));
 
         limitBreachedTime = _limitBreachedTime;
         feeAccrued = _feeAccrued;
+        uint feeAccruedWithoutCoStakers = _feeAccrued;
         for (uint i = _debtUpdateTime; i < endTime; i = i + period) {
             uint limit = _tokenAmount.mul(_price).div(_userToken.decimals()).div(4);
             // limit has been breached
@@ -513,13 +592,22 @@ contract Vault is IVault, Ownable {
                     limitBreachedTime = i;
                 }
             }
-            feeAccrued = feeAccrued + (_principal + feeAccrued).mul(rate).div(rateDivider);
+            uint feeTemp = (_principal.add(feeAccrued)).mul(rate);
+            feeTemp = feeTemp.div(365).div(rateDivider);
+            feeAccrued += feeTemp;
+
+            feeTemp = (_principal.add(feeAccruedWithoutCoStakers)).mul(rateWithoutCoStakers);
+            feeTemp = feeTemp.div(365).div(rateDivider);
+            feeAccruedWithoutCoStakers += feeTemp;
         }
-        return (feeAccrued, limitBreachedTime);
+        coStakerReward = _coStakerRewardAccrued.add((feeAccruedWithoutCoStakers.sub(feeAccrued)).div(2));
+        return (feeAccrued, coStakerReward, limitBreachedTime);
     }
 
     function _updateDebt() internal {
-        (_feeAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
+        if (_debtUpdateTime == _timeProvider.getTime())
+            return;
+        (_feeAccrued, _coStakerRewardAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
         _debtUpdateTime = _timeProvider.getTime();
     }
 
@@ -529,19 +617,24 @@ contract Vault is IVault, Ownable {
      * @return leftover - amount left after paying in EAU
      */
     function _payOffFees(uint amount) private returns (uint leftover) {
-        uint totalFeesAccrued;
-        uint limitBreachedTime;
-        (totalFeesAccrued, limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
-        _limitBreachedTime = limitBreachedTime;
+        _updateDebt();
+
+        if (_feeAccrued == 0)
+            return amount;
+
         uint feesPaid = 0;
         leftover = amount;
-        if (leftover > totalFeesAccrued) {
-            feesPaid = totalFeesAccrued;
-            leftover = leftover - totalFeesAccrued;
+        if (leftover > _feeAccrued + _coStakerRewardAccrued - _coStakerRewardStash) {
+            feesPaid = _feeAccrued;
+            leftover = leftover - _feeAccrued - _coStakerRewardAccrued + _coStakerRewardStash;
+            _coStakerRewardStash = _coStakerRewardAccrued;
             _feeAccrued = 0;
         } else {
-            feesPaid = leftover;
-            _feeAccrued = totalFeesAccrued - leftover;
+            feesPaid = leftover.mul(_feeAccrued).div(_feeAccrued + _coStakerRewardAccrued - _coStakerRewardStash);
+            leftover -= feesPaid;
+            // co-staker reward
+            _feeAccrued -= feesPaid;
+            _coStakerRewardStash += leftover;
             leftover = 0;
         }
         _totalFeesRepaid += feesPaid;
@@ -551,9 +644,8 @@ contract Vault is IVault, Ownable {
     }
 
     function _distributeFee(uint amount) private {
-        uint toBuyClgn = amount.div(2);
-
         // 50% to buy and burn CLGN
+        uint toBuyClgn = amount.div(2);
         uint clgnBought = _buyClgnForEau(toBuyClgn);
         _clgnToken.burn(clgnBought);
 
@@ -565,10 +657,11 @@ contract Vault is IVault, Ownable {
      * Returns how much EAU can get for selling clgnInAmount
      */
     function _getEauOutForClgnIn(uint clgnInAmount) private view returns (uint eauOutAmount) {
+        if (clgnInAmount == 0) return 0;
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
         path[1] = address(_eauToken);
-        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsOut(clgnInAmount, path);
+        uint[] memory amounts = _cologneDao.getClgnMarket().getAmountsOut(clgnInAmount, path);
         return amounts[1];
     }
 
@@ -576,10 +669,11 @@ contract Vault is IVault, Ownable {
      * Returns how much CLGN need to buy eauOutAmount
      */
     function _getClgnInForEauOut(uint eauOutAmount) private view returns (uint clgnAmount) {
+        if (eauOutAmount == 0) return 0;
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
         path[1] = address(_eauToken);
-        uint[] memory amounts = _medleyDao.getClgnMarket().getAmountsIn(eauOutAmount, path);
+        uint[] memory amounts = _cologneDao.getClgnMarket().getAmountsIn(eauOutAmount, path);
         return amounts[0];
     }
 
@@ -589,7 +683,8 @@ contract Vault is IVault, Ownable {
      * @return bought - amount bought
      */
     function _buyClgnForEau(uint eauAmount) private returns (uint bought) {
-        _eauToken.safeApprove(address(_medleyDao.getClgnMarket()), eauAmount);
+        if (eauAmount == 0) return 0;
+        _eauToken.safeApprove(address(_cologneDao.getClgnMarket()), eauAmount);
 
         address[] memory path = new address[](2);
         path[0] = address(_eauToken);
@@ -598,7 +693,7 @@ contract Vault is IVault, Ownable {
         // deadline is 1h
         uint deadline = block.timestamp + 3600;
 
-        uint[] memory amounts = _medleyDao.getClgnMarket().swapExactTokensForTokens(eauAmount, 0, path, address(this), deadline);
+        uint[] memory amounts = _cologneDao.getClgnMarket().swapExactTokensForTokens(eauAmount, 0, path, address(this), deadline);
         bought = amounts[1];
         require(eauAmount == amounts[0], "Vault::buyCLGN(): not exact amount of EAU sold to buy CLGN");
         return bought;
@@ -608,7 +703,8 @@ contract Vault is IVault, Ownable {
      * Sell as few CLGN as possible to get exact amount of eau
      */
     function _sellClgnForEau(uint maxClgnAmount, uint exactEauAmount) private returns (uint bought) {
-        _clgnToken.safeApprove(address(_medleyDao.getClgnMarket()), maxClgnAmount);
+        if (maxClgnAmount == 0 || exactEauAmount == 0) return 0;
+        _clgnToken.safeApprove(address(_cologneDao.getClgnMarket()), maxClgnAmount);
 
         address[] memory path = new address[](2);
         path[0] = address(_clgnToken);
@@ -617,12 +713,12 @@ contract Vault is IVault, Ownable {
         // deadline is 1h
         uint deadline = block.timestamp + 3600;
 
-        uint[] memory amounts = _medleyDao.getClgnMarket().swapTokensForExactTokens(exactEauAmount, maxClgnAmount, path, address(this), deadline);
+        uint[] memory amounts = _cologneDao.getClgnMarket().swapTokensForExactTokens(exactEauAmount, maxClgnAmount, path, address(this), deadline);
         uint sold = amounts[0];
         bought = amounts[1];
         require(sold <= maxClgnAmount, "Vault::sellCLGN(): CLGN sold is more than expected");
         if (sold < maxClgnAmount) {
-            _clgnToken.safeDecreaseAllowance(address(_medleyDao.getClgnMarket()), maxClgnAmount.sub(sold));
+            _clgnToken.safeDecreaseAllowance(address(_cologneDao.getClgnMarket()), maxClgnAmount.sub(sold));
         }
         require(bought == exactEauAmount, "Vault::sellCLGN(): not exact amount of EAU bought for CLGN");
         return bought;
@@ -633,4 +729,3 @@ contract Vault is IVault, Ownable {
         return _closeOutTime != 0 && (_timeProvider.getTime() - _closeOutTime >= 180000);
     }
 }
-

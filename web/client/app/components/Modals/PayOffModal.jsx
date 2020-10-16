@@ -32,20 +32,24 @@ export default class PayOffModal extends React.Component {
       error: false,
     });
 
-    const eauTokenAddress = await getCologneDaoContract().getEauTokenAddress();
+    const clgnContract = getCologneDaoContract();
+    const eauTokenAddress = await clgnContract.getEauTokenAddress();
+    const signer = getSigner();
 
     const eauTokenContract = new ethers.Contract(
       eauTokenAddress,
       tokenAbi,
-      getSigner(),
+      signer,
     );
 
-    await eauTokenContract.approve(
+    let res = await eauTokenContract.approve(
       vaultContract.address,
       ethers.utils.parseEther(tokenAmount),
     );
 
-    const res = await vaultContract
+    await res.wait(1);
+
+    res = await vaultContract
       .payOff(ethers.utils.parseEther(tokenAmount))
       .catch((error) => this.setState({error}));
 
@@ -124,6 +128,7 @@ export default class PayOffModal extends React.Component {
             <Message
               error
               header="Something went wrong"
+              style={{wordBreak: "break-all"}}
               content={
                 (error.data && error.data.message) ||
                 (error.message && error.message)

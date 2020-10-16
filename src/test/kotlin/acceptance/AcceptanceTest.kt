@@ -2,6 +2,7 @@ package acceptance
 
 import contract.*
 import helpers.ContractTestHelper
+import helpers.VaultState
 import org.junit.jupiter.api.BeforeEach
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.images.builder.ImageFromDockerfile
@@ -10,6 +11,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.web3j.crypto.Credentials
 import java.math.BigInteger
 import java.nio.file.Path
+import org.junit.jupiter.api.Assertions.assertEquals
 
 /**
  * Base class for acceptance tests
@@ -19,11 +21,11 @@ open class AcceptanceTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
-        GenericContainer<Nothing>(
-            ImageFromDockerfile()
-                .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
-        )
-            .withExposedPorts(8545)
+            GenericContainer<Nothing>(
+                    ImageFromDockerfile()
+                            .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
+            )
+                    .withExposedPorts(8545)
 
     val initialAmount = toTokenAmount(1_000)
     val tokenPrice = toTokenAmount(4)
@@ -79,15 +81,22 @@ open class AcceptanceTest {
     }
 
     /**
-     * Stakes CLGN to the owner vault
+     * Stake CLGN to the Vault
+     */
+    fun stake(account: Credentials, amount: BigInteger) {
+        helper.addCLGN(account.address, amount)
+        val clgnToken = UserToken.load(helper.clgnToken.contractAddress, helper.web3, account, helper.gasProvider)
+        clgnToken.approve(vaultByOwner.contractAddress, amount).send()
+        val vault = Vault.load(vaultByOwner.contractAddress, helper.web3, account, helper.gasProvider)
+        vault.stake(amount).send()
+    }
+
+    /**
+     * Stakes CLGN to the vault by owner
      * @param stake in attoCLGN
      */
     fun ownerStake(stake: BigInteger) {
-        // Stake
-        helper.addCLGN(owner.address, stake)
-        val clgnTokenByOwner = UserToken.load(helper.clgnToken.contractAddress, helper.web3, owner, helper.gasProvider)
-        clgnTokenByOwner.approve(vaultByOwner.contractAddress, stake).send()
-        vaultByOwner.stake(stake).send()
+        stake(owner, stake)
     }
 
     /**
@@ -105,6 +114,7 @@ open class AcceptanceTest {
     fun ownerBreachesVault() {
         val toBorrow = vaultByOwner.canBorrow().send()
         vaultByOwner.borrow(toBorrow).send()
+        assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
     }
 
     fun toTokenAmount(amount: Long): BigInteger {
@@ -128,10 +138,21 @@ open class AcceptanceTest {
         return amount.multiply(tokenPrice).divide(BigInteger.TEN.pow(userToken.decimals().send().toInt()))
     }
 
+    fun startInitialAuction() {
+        assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
+
+        // start Initial Liquidity Auction
+        vaultByInitiator.startInitialLiquidityAuction().send()
+
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
+    }
+
     /**
      * Fail initial liquidity auction
      */
     fun failInitialAuction() {
+        assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
+
         // Fail Initial Liquidity auction - Dutch auction has passed
         val time = helper.timeProvider.time.send().add(BigInteger.valueOf(180000))
         helper.timeProvider.setTime(time).send()

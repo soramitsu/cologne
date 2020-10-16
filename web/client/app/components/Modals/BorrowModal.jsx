@@ -30,6 +30,8 @@ export default class CloseModal extends React.Component {
       error: false,
     });
 
+    console.log(vaultContract);
+
     const res = await vaultContract
       .borrow(ethers.utils.parseEther(tokenAmount))
       .catch((error) => this.setState({error}));
@@ -116,6 +118,7 @@ export default class CloseModal extends React.Component {
             <Message
               error
               header="Something went wrong"
+              style={{wordBreak: "break-all"}}
               content={
                 (error.data && error.data.message) ||
                 (error.message && error.message)

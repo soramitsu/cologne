@@ -17,7 +17,7 @@ class VaultDetails extends React.Component {
             <Table.Row>
               <Table.HeaderCell>Token amount</Table.HeaderCell>
               <Table.HeaderCell>Price (EAU)</Table.HeaderCell>
-              <Table.HeaderCell>Collateral (EAU)</Table.HeaderCell>
+              <Table.HeaderCell>Collateral (CLGN)</Table.HeaderCell>
               <Table.HeaderCell>Total debt (EAU)</Table.HeaderCell>
               <Table.HeaderCell>Credit limit (EAU)</Table.HeaderCell>
               <Table.HeaderCell>Vault state</Table.HeaderCell>
@@ -55,8 +55,6 @@ class VaultDetails extends React.Component {
 
   renderChallengeTab = () => {
     const {vault} = this.props;
-
-    console.log(vault.challengeWinner);
 
     return (
       <Table basic="very">
@@ -99,21 +97,17 @@ class VaultDetails extends React.Component {
   };
 
   render() {
-    const {vault} = this.props;
 
     const panes = [
       {
         menuItem: "General info",
         render: this.renderMainTab,
       },
-    ];
-
-    if (vault.vaultState === 2) {
-      panes.push({
-        menuItem: "Challenge tab",
+      {
+        menuItem: "Challenge",
         render: this.renderChallengeTab,
-      });
-    }
+      }
+    ];
 
     return (
       <Container style={{marginTop: "1em"}}>
