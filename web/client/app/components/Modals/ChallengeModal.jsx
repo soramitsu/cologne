@@ -48,8 +48,6 @@ class ChallengeModal extends React.Component {
       loading: true
     });
 
-    console.log(Number.parseInt(eauToLock * price).toString());
-
     let res = await eauTokenContract.approve(
       vaultContract.address,
       ethers.utils.parseEther(eauToLock),

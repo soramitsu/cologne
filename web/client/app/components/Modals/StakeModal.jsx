@@ -1,4 +1,4 @@
-import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
+import {Button, Modal, Dropdown, Form, Message, Dimmer, Loader} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
@@ -9,6 +9,7 @@ export default class StakeModal extends React.Component {
   state = {
     open: false,
     error: false,
+    loading: false,
   };
 
   constructor() {
@@ -48,16 +49,25 @@ export default class StakeModal extends React.Component {
       ethers.utils.parseEther(tokenAmount),
     );
 
+      this.setState({
+          loading: true
+      });
+
     await res.wait(1);
+
+      this.setState({
+          loading: false
+      });
 
     res = await vaultContract
       .stake(ethers.utils.parseEther(tokenAmount))
-      .catch((error) => this.setState({error}));
+      .catch((error) => this.setState({error, loading: false}));
 
     if (res) {
       this.setState({
         open: false,
         error: false,
+        loading: false
       });
     }
   };
@@ -66,6 +76,7 @@ export default class StakeModal extends React.Component {
     this.setState({
       error: false,
       open: false,
+      loading: false
     });
   };
 
@@ -80,7 +91,7 @@ export default class StakeModal extends React.Component {
   };
 
   render() {
-    const {open, error} = this.state;
+    const {open, error, loading} = this.state;
 
     return (
       <Modal
@@ -92,6 +103,12 @@ export default class StakeModal extends React.Component {
       >
         <Modal.Header>Stake CLGN</Modal.Header>
         <Modal.Content>
+            {
+                loading ? <Dimmer active inverted>
+                    <Loader>Approving spending...</Loader>
+                </Dimmer> : ""
+            }
+
           <Formik
             innerRef={this.formRef}
             initialValues={{tokenAmount: ""}}

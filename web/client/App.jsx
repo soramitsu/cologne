@@ -21,6 +21,8 @@ const renderApp = () => {
   );
 };
 
+
+
 const getProvider = async () => {
   const provider = await detectEthereumProvider();
   if (provider) {
