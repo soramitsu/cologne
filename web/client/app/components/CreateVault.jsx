@@ -1,9 +1,13 @@
 import ethers from "ethers";
 import React from "react";
 import {Button, Container, Form, Message} from "semantic-ui-react";
-import {ganacheAddresses, networkMapper} from "../common/Constants";
-import {getCologneDaoContract, getSigner, getUserTokenContract} from "../common/Eth";
 import {connect} from "react-redux";
+import {ganacheAddresses, networkMapper} from "../common/Constants";
+import {
+  getCologneDaoContract,
+  getSigner,
+  getUserTokenContract,
+} from "../common/Eth";
 import {tokenAbi} from "../common/Abi";
 
 class CreateVault extends React.Component {
@@ -27,21 +31,24 @@ class CreateVault extends React.Component {
     const clgnContract = getCologneDaoContract();
     const signer = getSigner();
 
-    const tokenContract =  new ethers.Contract(
-        tokenAddress,
-        tokenAbi,
-        signer
-    );
+    const tokenContract = new ethers.Contract(tokenAddress, tokenAbi, signer);
 
     this.setState({
       loading: true,
     });
 
     // approve tx should be sent first for user token contract
-    let res = await tokenContract.approve(
-      networkMapper(chain.id).cologneDaoAddress,
-      ethers.utils.parseEther(tokenAmount),
-    );
+    let res = await tokenContract
+      .approve(
+        networkMapper(chain.id).cologneDaoAddress,
+        ethers.utils.parseEther(tokenAmount),
+      )
+      .catch((error) => {
+        this.setState({
+          error,
+          loading: false,
+        });
+      });
 
     await res.wait(1);
 
@@ -74,10 +81,8 @@ class CreateVault extends React.Component {
       tokenAddress,
       tokenAmount,
       error,
-      loading
+      loading,
     } = this.state;
-
-    console.log(loading);
 
     return (
       <Container style={{marginTop: "1em"}}>
@@ -136,8 +141,13 @@ class CreateVault extends React.Component {
               />
             )}
 
-            {loading ? <Button loading type="submit">Create</Button> : <Button type="submit">Create</Button>}
-
+            {loading ? (
+              <Button loading type="submit">
+                Create
+              </Button>
+            ) : (
+              <Button type="submit">Create</Button>
+            )}
           </Form>
         )}
       </Container>

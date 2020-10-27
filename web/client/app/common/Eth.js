@@ -1,10 +1,10 @@
 import ethers from "ethers";
+import detectEthereumProvider from "@metamask/detect-provider";
 import store from "../redux/Store";
 import {loginUser} from "../redux/actions/User";
 import {changeChain} from "../redux/actions/Chain";
 import {cologneDaoAbi, timeProviderAbi, tokenAbi} from "./Abi";
 import {networkMapper} from "./Constants";
-import detectEthereumProvider from "@metamask/detect-provider";
 
 // States emitted by Vault translated into string representation
 export const VaultStates = [
@@ -57,7 +57,6 @@ const checkProvider = detectEthereumProvider().then((provider) => {
 
   return provider;
 });
-
 
 export const getProvider = () =>
   new ethers.providers.Web3Provider(window.ethereum);

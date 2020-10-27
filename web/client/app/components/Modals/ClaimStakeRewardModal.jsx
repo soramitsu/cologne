@@ -1,12 +1,4 @@
-import {
-  Button,
-  Modal,
-  Dropdown,
-  Form,
-  Message,
-  Dimmer,
-  Loader,
-} from "semantic-ui-react";
+import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
@@ -17,7 +9,6 @@ export default class StakeModal extends React.Component {
   state = {
     open: false,
     error: false,
-    loading: false,
   };
 
   constructor() {
@@ -52,29 +43,21 @@ export default class StakeModal extends React.Component {
       signer,
     );
 
-    let res = await clgnTokenContract
-      .approve(vaultContract.address, ethers.utils.parseEther(tokenAmount))
-      .catch((error) => this.setState({error, loading: false}));
-
-    this.setState({
-      loading: true,
-    });
+    let res = await clgnTokenContract.approve(
+      vaultContract.address,
+      ethers.utils.parseEther(tokenAmount),
+    );
 
     await res.wait(1);
 
-    this.setState({
-      loading: false,
-    });
-
     res = await vaultContract
       .stake(ethers.utils.parseEther(tokenAmount))
-      .catch((error) => this.setState({error, loading: false}));
+      .catch((error) => this.setState({error}));
 
     if (res) {
       this.setState({
         open: false,
         error: false,
-        loading: false,
       });
     }
   };
@@ -83,7 +66,6 @@ export default class StakeModal extends React.Component {
     this.setState({
       error: false,
       open: false,
-      loading: false
     });
   };
 
@@ -98,7 +80,7 @@ export default class StakeModal extends React.Component {
   };
 
   render() {
-    const {open, error, loading} = this.state;
+    const {open, error} = this.state;
 
     return (
       <Modal
@@ -110,13 +92,6 @@ export default class StakeModal extends React.Component {
       >
         <Modal.Header>Stake CLGN</Modal.Header>
         <Modal.Content>
-          {loading ? (
-            <Dimmer active inverted>
-              <Loader>Approving spending...</Loader>
-            </Dimmer>
-          ) : (
-            ""
-          )}
           <Formik
             innerRef={this.formRef}
             initialValues={{tokenAmount: ""}}

@@ -71,6 +71,18 @@ class VaultsList extends React.Component {
 
         const challengeWinner = await vaultContract.getChallengeWinner();
 
+        const stake = ethers.utils.formatEther(
+          await vaultContract.getStake(address),
+        );
+
+        const stakeRewardAccrued = ethers.utils.formatEther(
+          await vaultContract.getStakeRewardAccrued(address),
+        );
+
+        const stakeRewardToClaim = ethers.utils.formatEther(
+          await vaultContract.getStakeRewardToClaim(address),
+        );
+
         return {
           vaultContract,
           isOwner,
@@ -85,6 +97,9 @@ class VaultsList extends React.Component {
           challengeLocked,
           redeemableChallenge,
           challengeWinner,
+          stake,
+          stakeRewardAccrued,
+          stakeRewardToClaim,
         };
       }),
     );
