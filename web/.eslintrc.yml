@@ -3,4 +3,4 @@ extends:
 env:
     browser: true
 rules:
-    linebreak-style: [off, 'unix']
+    linebreak-style: [off, 'windows']

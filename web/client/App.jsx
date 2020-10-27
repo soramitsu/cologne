@@ -5,10 +5,8 @@ import {render} from "react-dom";
 import {Provider} from "react-redux";
 import {createBrowserHistory} from "history";
 import {Router} from "react-router-dom";
-import detectEthereumProvider from "@metamask/detect-provider";
 import store from "./app/redux/Store";
 import Routes from "./app/Routes";
-import {changeChain} from "./app/redux/actions/Chain";
 
 export const History = createBrowserHistory();
 
@@ -21,22 +19,6 @@ const renderApp = () => {
   );
 };
 
-const getProvider = async () => {
-  const provider = await detectEthereumProvider();
-  if (provider) {
-    store.dispatch(
-      changeChain({
-        id: provider.chainId,
-      }),
-    );
-  } else {
-    console.log("Please install MetaMask!");
-  }
-
-  return provider;
-};
-
 store.subscribe(renderApp);
 
 renderApp();
-export const provider = getProvider();

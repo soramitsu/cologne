@@ -1,11 +1,10 @@
 import ethers from "ethers";
+import detectEthereumProvider from "@metamask/detect-provider";
 import store from "../redux/Store";
 import {loginUser} from "../redux/actions/User";
 import {changeChain} from "../redux/actions/Chain";
 import {cologneDaoAbi, timeProviderAbi, tokenAbi} from "./Abi";
 import {networkMapper} from "./Constants";
-import detectEthereumProvider from "@metamask/detect-provider";
-import {provider} from "../../App";
 
 // States emitted by Vault translated into string representation
 export const VaultStates = [
@@ -21,27 +20,36 @@ export const VaultStates = [
 
 export const stateFormatter = (state) => VaultStates[state];
 
-if (provider) {
-  // Network changed handler
-  window.ethereum.on("chainChanged", (chainId) => {
-    console.log(`Network has changed, new network id: ${chainId}`);
+detectEthereumProvider().then((provider) => {
+  if (provider) {
     store.dispatch(
-        changeChain({
-          id: chainId,
-        }),
+      changeChain({
+        id: provider.chainId,
+      }),
+    );
+  } else {
+    console.error("Please install MetaMask!");
+  }
+
+  window.ethereum.on("chainChanged", (chainId) => {
+    console.info(`Network has changed, new network id: ${chainId}`);
+    store.dispatch(
+      changeChain({
+        id: chainId,
+      }),
     );
   });
 
-// Account changed handler
+  // Account changed handler
   window.ethereum.on("accountsChanged", (newAccounts) => {
-    console.log(`Account has changed, new account: ${newAccounts[0]}`);
+    console.info(`Account has changed, new account: ${newAccounts[0]}`);
     store.dispatch(
-        loginUser({
-          address: newAccounts[0],
-        }),
+      loginUser({
+        address: newAccounts[0],
+      }),
     );
   });
-}
+});
 
 export const getProvider = () =>
   new ethers.providers.Web3Provider(window.ethereum);
