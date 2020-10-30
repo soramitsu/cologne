@@ -1,4 +1,12 @@
-import {Button, Modal, Dropdown, Form, Message, Loader, Dimmer} from "semantic-ui-react";
+import {
+  Button,
+  Modal,
+  Dropdown,
+  Form,
+  Message,
+  Loader,
+  Dimmer,
+} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
@@ -10,6 +18,7 @@ class BuyModal extends React.Component {
   state = {
     open: false,
     error: false,
+    loading: false,
   };
 
   constructor() {
@@ -45,23 +54,25 @@ class BuyModal extends React.Component {
       signer,
     );
 
-    console.log((Number.parseFloat(maxPrice) * Number.parseInt(tokenAmount)).toString());
-
-    let res = await eauTokenContract.approve(
-      vaultContract.address,
-      ethers.utils.parseEther(
-        (Number.parseFloat(maxPrice) * Number.parseInt(tokenAmount)).toString(),
-      ),
-    );
+    let res = await eauTokenContract
+      .approve(
+        vaultContract.address,
+        ethers.utils.parseEther(
+          (
+            Number.parseFloat(maxPrice) * Number.parseInt(tokenAmount)
+          ).toString(),
+        ),
+      )
+      .catch((error) => this.setState({error}));
 
     this.setState({
-      loading: true
+      loading: true,
     });
 
     await res.wait(1);
 
     this.setState({
-      loading: false
+      loading: false,
     });
 
     res = await vaultContract
@@ -76,7 +87,7 @@ class BuyModal extends React.Component {
       this.setState({
         open: false,
         error: false,
-        loading: false
+        loading: false,
       });
     }
   };
@@ -113,11 +124,13 @@ class BuyModal extends React.Component {
         open={open}
         trigger={<Dropdown.Item>Buy</Dropdown.Item>}
       >
-        {
-          loading ? <Dimmer active inverted>
+        {loading ? (
+          <Dimmer active inverted>
             <Loader>Approving spending...</Loader>
-          </Dimmer> : ""
-        }
+          </Dimmer>
+        ) : (
+          ""
+        )}
 
         <Modal.Header>Buy tokens from the contract</Modal.Header>
         <Modal.Content>

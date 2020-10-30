@@ -5,6 +5,7 @@ import {ethers} from "ethers";
 import VaultsActions from "./VaultsActions";
 import ChallengeActions from "./ChallengeActions";
 import {stateFormatter} from "../common/Eth";
+import StakingActions from "./StakingActions";
 
 class VaultDetails extends React.Component {
   renderMainTab = () => {
@@ -53,6 +54,36 @@ class VaultDetails extends React.Component {
     );
   };
 
+  renderStakingTab = () => {
+    const {vault} = this.props;
+
+    return (
+      <Table basic="very">
+        <Table.Header>
+          <Table.Row>
+            <Table.HeaderCell>Your current stake</Table.HeaderCell>
+            <Table.HeaderCell>Stake reward accrued</Table.HeaderCell>
+            <Table.HeaderCell>Claimable stake reward</Table.HeaderCell>
+            <Table.HeaderCell />
+          </Table.Row>
+        </Table.Header>
+
+        <Table.Body>
+          <Table.Row>
+            <Table.Cell>
+              <Header as="h5">{vault.stake}</Header>
+            </Table.Cell>
+            <Table.Cell>
+              <Header as="h5">{vault.stakeRewardAccrued}</Header>
+            </Table.Cell>
+            <Table.Cell>{vault.stakeRewardToClaim}</Table.Cell>
+            <StakingActions item={vault} />
+          </Table.Row>
+        </Table.Body>
+      </Table>
+    );
+  };
+
   renderChallengeTab = () => {
     const {vault} = this.props;
 
@@ -97,16 +128,19 @@ class VaultDetails extends React.Component {
   };
 
   render() {
-
     const panes = [
       {
         menuItem: "General info",
         render: this.renderMainTab,
       },
       {
+        menuItem: "Staking",
+        render: this.renderStakingTab,
+      },
+      {
         menuItem: "Challenge",
         render: this.renderChallengeTab,
-      }
+      },
     ];
 
     return (

@@ -25,8 +25,8 @@ class VaultsList extends React.Component {
   }
 
   poll = async () => {
+    const signer = getSigner();
     const contract = getCologneDaoContract();
-
     const vaults = await contract.listVaults();
 
     const {
@@ -35,7 +35,7 @@ class VaultsList extends React.Component {
 
     const enrichedVaults = await Promise.all(
       vaults.map(async (vault) => {
-        const vaultContract = new ethers.Contract(vault, vaultAbi, getSigner());
+        const vaultContract = new ethers.Contract(vault, vaultAbi, signer);
 
         const price = ethers.utils.formatEther(await vaultContract.getPrice());
 
@@ -71,6 +71,18 @@ class VaultsList extends React.Component {
 
         const challengeWinner = await vaultContract.getChallengeWinner();
 
+        const stake = ethers.utils.formatEther(
+          await vaultContract.getStake(address),
+        );
+
+        const stakeRewardAccrued = ethers.utils.formatEther(
+          await vaultContract.getStakeRewardAccrued(address),
+        );
+
+        const stakeRewardToClaim = ethers.utils.formatEther(
+          await vaultContract.getStakeRewardToClaim(address),
+        );
+
         return {
           vaultContract,
           isOwner,
@@ -85,6 +97,9 @@ class VaultsList extends React.Component {
           challengeLocked,
           redeemableChallenge,
           challengeWinner,
+          stake,
+          stakeRewardAccrued,
+          stakeRewardToClaim,
         };
       }),
     );
@@ -128,18 +143,25 @@ class VaultsList extends React.Component {
           {items.map((item) => (
             <Item key={item.address}>
               <Item.Content>
-                <Item.Header as="a" style={{color: (item.vaultState === 6) ? "gray" : ""}}>{item.address} {(item.vaultState === 6) ? "(closed)" : ""}</Item.Header>
+                <Item.Header
+                  as="a"
+                  style={{color: item.vaultState === 6 ? "gray" : ""}}
+                >
+                  {item.address} {item.vaultState === 6 ? "(closed)" : ""}
+                </Item.Header>
                 <Item.Meta>
                   Owned by {item.isOwner ? "you" : item.ownerAddress}, contains{" "}
                   {item.tokenAmount} tokens
                 </Item.Meta>
-                  {
-                      (item.vaultState !== 6) ?  <Item.Description
-                          onClick={() => this.toggleExpand(item.address)}
-                      >
-                          {expanded[item.address] ? "Hide details" : "Expand details"}
-                      </Item.Description> : ""
-                  }
+                {item.vaultState !== 6 ? (
+                  <Item.Description
+                    onClick={() => this.toggleExpand(item.address)}
+                  >
+                    {expanded[item.address] ? "Hide details" : "Expand details"}
+                  </Item.Description>
+                ) : (
+                  ""
+                )}
                 {expanded[item.address] && <VaultDetails vault={item} />}
               </Item.Content>
             </Item>

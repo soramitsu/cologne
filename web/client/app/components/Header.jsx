@@ -54,6 +54,7 @@ class Header extends React.Component {
           <Menu.Item header as={NavLink} to="/main" activeclassname="active">
             Dashboard
           </Menu.Item>
+
           <Menu.Item>Current time: {time}</Menu.Item>
           <Menu.Menu position="right">
             {address && (

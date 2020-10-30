@@ -1,4 +1,4 @@
-import {Button, Modal, Dropdown, Form, Message} from "semantic-ui-react";
+import {Button, Modal, Dropdown, Form, Message, Dimmer, Loader} from "semantic-ui-react";
 import React from "react";
 import ethers from "ethers";
 import {Formik} from "formik";
@@ -10,6 +10,7 @@ class ChallengeModal extends React.Component {
   state = {
     open: false,
     error: false,
+    loading: false,
   };
 
   constructor() {
@@ -33,18 +34,30 @@ class ChallengeModal extends React.Component {
       error: false,
     });
 
-    const eauTokenAddress = await getCologneDaoContract().getEauTokenAddress();
+    const clgnContract = getCologneDaoContract();
+    const eauTokenAddress = await clgnContract.getEauTokenAddress();
+    const signer = getSigner();
 
     const eauTokenContract = new ethers.Contract(
       eauTokenAddress,
       tokenAbi,
-      getSigner(),
+      signer,
     );
 
-    await eauTokenContract.approve(
+    this.setState({
+      loading: true
+    });
+
+    let res = await eauTokenContract.approve(
       vaultContract.address,
-      ethers.utils.parseEther(Number.parseInt(eauToLock).toString()),
+      ethers.utils.parseEther(eauToLock),
     );
+
+    await res.wait(1);
+
+    this.setState({
+      loading: false
+    });
 
     /**
      * Challenge
@@ -52,7 +65,7 @@ class ChallengeModal extends React.Component {
      * @param price - price to buy out User Tokens in attoEAU
      * @param eauToLock - EAU to lock for purchase (must be >= value of Tokens in EAU at specified price)
      */
-    const res = await vaultContract
+    res = await vaultContract
       .challenge(
         ethers.utils.parseEther(price),
         // price * await vaultContract.getTokenAmount()
@@ -64,6 +77,7 @@ class ChallengeModal extends React.Component {
       this.setState({
         open: false,
         error: false,
+        loading: false
       });
     }
   };
@@ -90,7 +104,7 @@ class ChallengeModal extends React.Component {
   };
 
   render() {
-    const {open, error} = this.state;
+    const {open, error, loading} = this.state;
 
     return (
       <Modal
@@ -100,6 +114,12 @@ class ChallengeModal extends React.Component {
         open={open}
         trigger={<Dropdown.Item>Challenge</Dropdown.Item>}
       >
+        {
+          loading ? <Dimmer active inverted>
+            <Loader>Approving spending...</Loader>
+          </Dimmer> : ""
+        }
+
         <Modal.Header>Challenge the contract</Modal.Header>
         <Modal.Content>
           <Formik
