@@ -17,46 +17,34 @@ class PayOffAcceptanceTest : AcceptanceTest() {
      */
     @Test
     fun payOffFeeDependsOnHistory() {
-        ownerCreatesVault(initialAmount = toTokenAmount(10_000_000), tokenPrice = toTokenAmount(40))
+        ownerCreatesVault(initialAmount = toTokenAmount(10_000), tokenPrice = toTokenAmount(40))
 
-        val eauToBorrow = toTokenAmount(10_000_000)
+        val eauToBorrow = toTokenAmount(10_000)
         vaultByOwner.borrow(eauToBorrow).send()
         // pass one year to accrue fees (more 1_000_000 EAU)
         passTime(BigInteger.valueOf(365 * 24 * 3600))
-        assertTrue(toTokenAmount(1_000_000) <= vaultByOwner.fees.send())
+        assertTrue(toTokenAmount(1_000) <= vaultByOwner.fees.send())
         assertEquals(BigInteger.ZERO, vaultByOwner.totalFeesRepaid.send())
 
         // interest rate is not discounted (101%)
         assertEquals(toInterestRate(101, 100), vaultByOwner.feeRate.send())
 
         // pay off 1_000, interest rate is 100,9%
-        var feeToPayOff = toTokenAmount(1_000)
+        var feeToPayOff = toTokenAmount(1)
         ownerPaysOff(feeToPayOff)
-        assertEquals(toTokenAmount(1_000), vaultByOwner.totalFeesRepaid.send())
-        assertEquals(toInterestRate(1009, 1000), vaultByOwner.feeRate.send())
+        assertEquals(toTokenAmount(1), vaultByOwner.totalFeesRepaid.send())
+        assertEquals(toInterestRate(1009999, 1000000), vaultByOwner.feeRate.send())
 
         // pay off 1_000 more, interest rate is 100,8%
         ownerPaysOff(feeToPayOff)
-        assertEquals(toTokenAmount(2_000), vaultByOwner.totalFeesRepaid.send())
-        assertEquals(toInterestRate(1008, 1000), vaultByOwner.feeRate.send())
+        assertEquals(toTokenAmount(2), vaultByOwner.totalFeesRepaid.send())
+        assertEquals(toInterestRate(1009998, 1000000), vaultByOwner.feeRate.send())
 
         // pay off 997_000 more, total 999_000, interest rate is 1,1%
-        feeToPayOff = toTokenAmount(997_000)
+        feeToPayOff = toTokenAmount(9_998)
         ownerPaysOff(feeToPayOff)
-        assertEquals(toTokenAmount(999_000), vaultByOwner.totalFeesRepaid.send())
-        assertEquals(toInterestRate(11, 1000), vaultByOwner.feeRate.send())
-
-        // pay off 1_000 more, total 1_000_000, interest rate is 1% (max discount)
-        feeToPayOff = toTokenAmount(1_000)
-        ownerPaysOff(feeToPayOff)
-        assertEquals(toTokenAmount(1_000_000), vaultByOwner.totalFeesRepaid.send())
-        assertEquals(toInterestRate(1, 100), vaultByOwner.feeRate.send())
-
-        // pay off 1_000 more, total 1_001_000, interest rate is 1% (max discount)
-        feeToPayOff = toTokenAmount(1_000)
-        ownerPaysOff(feeToPayOff)
-        assertEquals(toTokenAmount(1_001_000), vaultByOwner.totalFeesRepaid.send())
-        assertEquals(toInterestRate(1, 100), vaultByOwner.feeRate.send())
+        assertEquals(toTokenAmount(10_000), vaultByOwner.totalFeesRepaid.send())
+        assertEquals(toInterestRate(1000000, 1000000), vaultByOwner.feeRate.send())
     }
 
     /**

@@ -87,7 +87,7 @@ class SlashingAcceptanceTest : AcceptanceTest() {
 
     /**
      * Co-stakeholders get 50% of fee saved as reward
-     * @given the vault is deployed and has a debt and fees accrued are 550 EAU and the owner pays
+     * @given the vault is deployed and has a debt and fees accrued are 5,5 EAU and the owner pays
      * fees off
      * @when claim stake reward called
      * @then co-stake reward transferred
@@ -95,12 +95,14 @@ class SlashingAcceptanceTest : AcceptanceTest() {
     @Test
     fun coStakeClaimReward() {
         // 91% coverage to discount fee rate to 10%
-        val ownerStakeAmount = toTokenAmount(3650000 / 2 / 100 * 91)
-        ownerCreatesVault(toTokenAmount(3650000 * 4), toTokenAmount(1))
+        val ownerStakeAmount = toTokenAmount(3650 * 91 / 2, 100)
+        ownerCreatesVault(toTokenAmount(3650 * 4), toTokenAmount(1))
         ownerBreachesVault()
         ownerStake(ownerStakeAmount)
+        assertEquals(toTokenAmount(3650), vaultByOwner.totalDebt.send())
 
-        val coStakeAmount = toTokenAmount(3650000)
+        assertEquals(toInterestRate(10, 100), vaultByOwner.feeRate.send())
+        val coStakeAmount = toTokenAmount(3650)
         val coStakeholder = buyer
         val vaultByCoStakeholder = vaultByBuyer
         stake(coStakeholder, coStakeAmount)
@@ -108,23 +110,23 @@ class SlashingAcceptanceTest : AcceptanceTest() {
         passTime(BigInteger.valueOf(86400))
 
         // 550 (100 - fee and 450 reward = (1000 - 100) / 2)
-        assertEquals(toTokenAmount(100), vaultByOwner.fees.send())
-        assertEquals(toTokenAmount(450), vaultByOwner.getStakeRewardAccrued().send())
+        assertEquals(toTokenAmount(10, 100), vaultByOwner.fees.send())
+        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued().send())
         assertEquals(toTokenAmount(0), vaultByOwner.getStakeRewardToClaim(coStakeholder.address).send())
 
-        ownerPaysOff(toTokenAmount(550))
+        ownerPaysOff(toTokenAmount(55, 100))
 
-        assertEquals(toTokenAmount(450), vaultByOwner.getStakeRewardAccrued(coStakeholder.address).send())
-        assertEquals(toTokenAmount(450), vaultByOwner.getStakeRewardAccrued().send())
-        assertEquals(toTokenAmount(450), vaultByOwner.getStakeRewardToClaim(coStakeholder.address).send())
+        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued(coStakeholder.address).send())
+        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued().send())
+        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardToClaim(coStakeholder.address).send())
         assertEquals(toTokenAmount(0), vaultByOwner.fees.send())
 
         vaultByCoStakeholder.claimStakeReward(coStakeholder.address).send()
 
-        assertEquals(toTokenAmount(450), vaultByOwner.getStakeRewardAccrued(coStakeholder.address).send())
-        assertEquals(toTokenAmount(450), vaultByOwner.getStakeRewardAccrued().send())
+        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued(coStakeholder.address).send())
+        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued().send())
         assertEquals(toTokenAmount(0), vaultByOwner.getStakeRewardToClaim(coStakeholder.address).send())
         assertEquals(toTokenAmount(0), vaultByOwner.fees.send())
-        assertEquals(toTokenAmount(450), eauToken.balanceOf(coStakeholder.address).send())
+        assertEquals(toTokenAmount(45, 100), eauToken.balanceOf(coStakeholder.address).send())
     }
 }

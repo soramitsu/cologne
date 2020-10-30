@@ -154,8 +154,12 @@ class ContractTestHelper(host: String, port: Int) {
     }
 
     companion object {
+        fun toTokenAmount(amount: BigInteger): BigInteger {
+            return amount.multiply(BigInteger.TEN.pow(18));
+        }
+
         fun toTokenAmount(amount: Long): BigInteger {
-            return BigInteger.valueOf(amount).multiply(BigInteger.TEN.pow(18));
+            return toTokenAmount(BigInteger.valueOf(amount))
         }
     }
 }

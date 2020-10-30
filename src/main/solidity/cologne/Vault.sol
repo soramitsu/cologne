@@ -415,11 +415,25 @@ contract Vault is IVault, Ownable {
         return fees;
     }
 
+    /**
+     * How many EAU the owner can borrow.
+     * The amount is 25% of user token assessed in EAU. Total principal is limited at 10.000 EAU
+     */
     function getCreditLimit() public view override returns (uint) {
-        return _tokenAmount.mul(getPrice()).div(4).div(10 ** _userToken.decimals());
+        uint creditLimit = _tokenAmount.mul(getPrice()).div(4).div(10 ** _userToken.decimals());
+        uint maxLimit = 10000 * (10 ** _eauToken.decimals());
+        if (maxLimit > _principal) {
+            maxLimit -= _principal;
+        } else {
+            maxLimit = 0;
+        }
+        return Math.min(creditLimit, maxLimit);
     }
 
-    // How much the owner can borrow at the moment. Takes into account the value has already borrowed.
+    /**
+     * How much the owner can borrow at the moment.
+     * Takes into account the value has already borrowed.
+     */
     function canBorrow() public view override returns (uint) {
         if (_closed) return 0;
         uint debt = getTotalDebt();

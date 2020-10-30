@@ -21,11 +21,11 @@ open class AcceptanceTest {
 
     @Container
     private val ganache: GenericContainer<Nothing> =
-            GenericContainer<Nothing>(
-                    ImageFromDockerfile()
-                            .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
-            )
-                    .withExposedPorts(8545)
+        GenericContainer<Nothing>(
+            ImageFromDockerfile()
+                .withDockerfile(Path.of(javaClass.getResource("/docker/ganache/Dockerfile").toURI()))
+        )
+            .withExposedPorts(8545)
 
     val initialAmount = toTokenAmount(1_000)
     val tokenPrice = toTokenAmount(4)
@@ -117,8 +117,8 @@ open class AcceptanceTest {
         assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
     }
 
-    fun toTokenAmount(amount: Long): BigInteger {
-        return ContractTestHelper.toTokenAmount(amount)
+    fun toTokenAmount(amount: Long, divider: Long = 1): BigInteger {
+        return ContractTestHelper.toTokenAmount(BigInteger.valueOf(amount)).div(BigInteger.valueOf(divider))
     }
 
     fun toPrettyBalance(balance: BigInteger): String {
