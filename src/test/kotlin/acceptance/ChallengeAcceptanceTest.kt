@@ -42,6 +42,7 @@ class ChallengeAcceptanceTest : AcceptanceTest() {
     @Test
     fun initialLiquidityAuctionIsOver() {
         ownerCreatesVault()
+        ownerStake100Percent()
         val challenger = helper.credentialsCharlie
         ownerBreachesVault()
         startInitialAuction()
@@ -219,6 +220,7 @@ class ChallengeAcceptanceTest : AcceptanceTest() {
         val initialAmount = toTokenAmount(100)
         val tokenPrice = toTokenAmount(10)
         ownerCreatesVault(initialAmount, tokenPrice)
+        ownerStake100Percent()
 
         val challenger = helper.credentialsDave
         val vaultByChallenger = Vault.load(vaultByOwner.contractAddress, helper.web3, challenger, helper.gasProvider)

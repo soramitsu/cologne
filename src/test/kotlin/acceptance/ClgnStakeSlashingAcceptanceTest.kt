@@ -48,6 +48,7 @@ class ClgnStakeSlashingAcceptanceTest : AcceptanceTest() {
     @Test
     fun slashAuctionNotOver() {
         ownerCreatesVault()
+        ownerStake100Percent()
         ownerBreachesVault()
 
         assertThrows<TransactionException> {
@@ -82,7 +83,7 @@ class ClgnStakeSlashingAcceptanceTest : AcceptanceTest() {
     }
 
     /**
-     * @given the vault has principal debt of 4000 EAU and some fee accrued and stake of 1000 CLGN (assessed as 2000
+     * @given the vault has principal debt of 10000 EAU and some fee accrued and stake of 4000 CLGN (assessed as 8000
      * EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off partially (1800 EAU paid off and 2200 is current debt) and fees are forgiven and
@@ -91,8 +92,8 @@ class ClgnStakeSlashingAcceptanceTest : AcceptanceTest() {
     @Test
     fun slashPrincipalPartiallyCovered() {
         helper.addEAU(helper.marketAdaptor.contractAddress, toTokenAmount(2000))
-        ownerCreatesVault(initialAmount = toTokenAmount(16000), tokenPrice = toTokenAmount(1))
-        ownerStake(toTokenAmount(1000))
+        ownerCreatesVault(initialAmount = toTokenAmount(40000), tokenPrice = toTokenAmount(1))
+        ownerStake(toTokenAmount(4000))
         ownerBreachesVault()
         // wait 5 days for fees and ensure fees accrued
         helper.passTime(BigInteger.valueOf(5 * 24 * 3600))
@@ -103,29 +104,30 @@ class ClgnStakeSlashingAcceptanceTest : AcceptanceTest() {
 
         vaultBySlasher.slash().send()
 
-        assertEquals(toTokenAmount(2200), vaultByOwner.totalDebt.send())
-        assertEquals(toTokenAmount(2200), vaultByOwner.principal.send())
+        assertEquals(toTokenAmount(2800), vaultByOwner.totalDebt.send())
+        assertEquals(toTokenAmount(2800), vaultByOwner.principal.send())
         assertEquals(BigInteger.ZERO, vaultByOwner.fees.send())
         assertEquals(BigInteger.ZERO, vaultByOwner.collateralInEau.send())
     }
 
     /**
-     * @given the vault has principal debt of 10000 EAU and fees accrued more then 100 EAU and stake of 5600 CLGN
+     * @given the vault has principal debt of 10000 EAU and fees accrued more then 10 EAU and stake of 5600 CLGN
      * (assessed as 11100 EAU) and initial liquidity auction failed
      * @when slashing called
      * @then principal is paid off (10000 EAU) and penalty paid off (1000 EAU) and fees paid off partially (100 EAU) and
      * the rest of fees are forgiven
      */
     @Test
-    fun slashPrincipalsCoveredAndFeesPatiallyCovered() {
-//        helper.addEAU(helper.marketAdaptor.contractAddress, toTokenAmount(20000))
-        ownerCreatesVault(initialAmount = toTokenAmount(40000), tokenPrice = toTokenAmount(1))
+    fun slashPrincipalsCoveredAndFeesPartiallyCovered() {
+        val tokenPrice = toTokenAmount(1)
+        ownerCreatesVault(initialAmount = toTokenAmount(40000), tokenPrice = tokenPrice)
+        val toStake = toTokenAmount(5510);
+        ownerStake(toStake)
         ownerBreachesVault()
         // ensure fees are not covered by stake
         helper.passTime(BigInteger.valueOf(100 * 24 * 3600))
         assertEquals(toTokenAmount(10_000), vaultByOwner.principal.send())
-        ownerStake(toTokenAmount(6000))
-        assertTrue(vaultByOwner.fees.send() > toTokenAmount(100))
+        assertTrue(vaultByOwner.fees.send() > toTokenAmount(10))
         // start and fail Initial Liquidity Auction
         vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()

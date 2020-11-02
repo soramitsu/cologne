@@ -20,7 +20,8 @@ class ClgnAuctionAccept : AcceptanceTest() {
     @Test
     fun coverShortfallClose() {
         ownerCreatesVault()
-        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        val coverInitiatorVault =
+            Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
         vaultByOwner.close().send()
 
         assertThrows<TransactionException> {
@@ -36,7 +37,9 @@ class ClgnAuctionAccept : AcceptanceTest() {
     @Test
     fun coverShortfallAuction() {
         ownerCreatesVault()
-        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        ownerStake100Percent()
+        val coverInitiatorVault =
+            Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
 
@@ -53,7 +56,9 @@ class ClgnAuctionAccept : AcceptanceTest() {
     @Test
     fun coverShortfallNotSlashed() {
         ownerCreatesVault()
-        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        ownerStake100Percent()
+        val coverInitiatorVault =
+            Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()
@@ -72,7 +77,9 @@ class ClgnAuctionAccept : AcceptanceTest() {
     @Test
     fun coverShortfallWrongInitiator() {
         ownerCreatesVault()
-        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
+        ownerStake100Percent()
+        val coverInitiatorVault =
+            Vault.load(vaultByOwner.contractAddress, helper.web3, helper.credentialsDave, helper.gasProvider)
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()
@@ -94,7 +101,10 @@ class ClgnAuctionAccept : AcceptanceTest() {
         helper.addEAU(helper.marketAdaptor.contractAddress, toTokenAmount(1100))
         helper.addCLGN(coverInitiator.address, toTokenAmount(25))
         ownerCreatesVault()
-        val coverInitiatorVault = Vault.load(vaultByOwner.contractAddress, helper.web3, coverInitiator, helper.gasProvider)
+        val toStake = toTokenAmount(400);
+        ownerStake(toStake)
+        val coverInitiatorVault =
+            Vault.load(vaultByOwner.contractAddress, helper.web3, coverInitiator, helper.gasProvider)
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
         failInitialAuction()
@@ -108,9 +118,9 @@ class ClgnAuctionAccept : AcceptanceTest() {
         coverInitiatorVault.coverShortfall().send()
 
         assertEquals(VaultState.Slashed.toBigInteger(), vaultByOwner.state.send())
-        assertEquals(toTokenAmount(550), clgnToken.totalSupply().send().subtract(initialClgnSupply))
+        assertEquals(toTokenAmount(134), clgnToken.totalSupply().send().subtract(initialClgnSupply))
         assertEquals(BigInteger.ZERO, vaultByOwner.getTotalDebt().send())
-        assertEquals(toTokenAmount(100), eauToken.balanceOf(coverInitiator.address).send())
+        assertEquals(toTokenAmount(28), eauToken.balanceOf(coverInitiator.address).send())
         assertEquals(VaultState.Slashed.toBigInteger(), vaultByOwner.state.send())
     }
 }

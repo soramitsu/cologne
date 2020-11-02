@@ -22,6 +22,7 @@ class VaultTest : AcceptanceTest() {
         val initialAmount = toTokenAmount(100)
         val tokenPrice = toTokenAmount(2)
         ownerCreatesVault(initialAmount = initialAmount, tokenPrice = tokenPrice)
+        ownerStake100Percent(tokenInEau = tokenPrice)
 
         assertEquals(VaultState.Trading.toBigInteger(), vaultByOwner.state.send())
         assertEquals(owner.address, vaultByOwner.owner().send())
@@ -62,7 +63,8 @@ class VaultTest : AcceptanceTest() {
      */
     @Test
     fun closeWithDebtNotAllowed() {
-        ownerCreatesVault(initialAmount, tokenPrice)
+        ownerCreatesVault()
+        ownerStake100Percent()
         val toBorrow = toTokenAmount(10)
         vaultByOwner.borrow(toBorrow).send()
 
@@ -132,12 +134,12 @@ class VaultTest : AcceptanceTest() {
      */
     @Test
     fun borrowExceedsLimit() {
-        ownerCreatesVault(initialAmount, tokenPrice)
-        val toBorrow = vaultByOwner.canBorrow().send()
-        vaultByOwner.borrow(toBorrow).send()
+        ownerCreatesVault()
+        ownerStake100Percent()
+        ownerBreachesVault()
 
         assertThrows<TransactionException> {
-            vaultByOwner.borrow(toBorrow).send()
+            vaultByOwner.borrow(toTokenAmount(1)).send()
         }
     }
 
@@ -166,8 +168,8 @@ class VaultTest : AcceptanceTest() {
     @Test
     fun payOffDebtPartially() {
         val initialAmount = toTokenAmount(50_000)
-        val tokenPrice = toTokenAmount(4)
-        ownerCreatesVault(initialAmount, tokenPrice)
+        ownerCreatesVault(initialAmount = initialAmount)
+        ownerStake100Percent()
         val debtBefore = toTokenAmount(10_000)
         vaultByOwner.borrow(debtBefore).send()
         val toPayOff = toTokenAmount(5_000)

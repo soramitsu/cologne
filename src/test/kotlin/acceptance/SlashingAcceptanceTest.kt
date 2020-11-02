@@ -97,8 +97,8 @@ class SlashingAcceptanceTest : AcceptanceTest() {
         // 91% coverage to discount fee rate to 10%
         val ownerStakeAmount = toTokenAmount(3650 * 91 / 2, 100)
         ownerCreatesVault(toTokenAmount(3650 * 4), toTokenAmount(1))
-        ownerBreachesVault()
         ownerStake(ownerStakeAmount)
+        ownerBreachesVault()
         assertEquals(toTokenAmount(3650), vaultByOwner.totalDebt.send())
 
         assertEquals(toInterestRate(10, 100), vaultByOwner.feeRate.send())

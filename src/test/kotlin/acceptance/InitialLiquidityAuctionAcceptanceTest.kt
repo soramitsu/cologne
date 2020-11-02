@@ -51,6 +51,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
     @Test
     fun closeOutDoubleCalled() {
         ownerCreatesVault()
+        ownerStake100Percent()
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
 
@@ -67,8 +68,9 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
     @Test
     fun closeOutDutchAuctionPriceChange() {
         val timeInterval = BigInteger.valueOf(30 * 60) // 30 min
-        val price = toTokenAmount(100000)
-        ownerCreatesVault(tokenPrice = price)
+        val price = toTokenAmount(10000)
+        ownerCreatesVault(tokenPrice = price, initialAmount = BigInteger.ONE)
+        ownerStake100Percent(tokenInEau = price)
         ownerBreachesVault()
         assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
         vaultByInitiator.startInitialLiquidityAuction().send()
@@ -77,15 +79,15 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
         assertEquals(price, vaultByOwner.price.send())
 
         helper.passTime(timeInterval)
-        assertEquals(toTokenAmount(99000), vaultByOwner.price.send())
+        assertEquals(toTokenAmount(9900), vaultByOwner.price.send())
         assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
 
         helper.passTime(timeInterval)
-        assertEquals(toTokenAmount(98000), vaultByOwner.price.send())
+        assertEquals(toTokenAmount(9800), vaultByOwner.price.send())
         assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
 
         helper.passTime(timeInterval.multiply(BigInteger.valueOf(97)))
-        assertEquals(toTokenAmount(1000), vaultByOwner.price.send())
+        assertEquals(toTokenAmount(100), vaultByOwner.price.send())
         assertEquals(VaultState.InitialLiquidityAuctionInProcess.toBigInteger(), vaultByOwner.state.send())
 
         helper.passTime(timeInterval)
@@ -104,6 +106,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
     fun buyTokensWhenVaultBreached() {
         val price = toTokenAmount(2)
         ownerCreatesVault(tokenPrice = price)
+        ownerStake100Percent(tokenInEau = price)
         ownerBreachesVault()
         val costInEau = getEauToBuyUserTokenAmount(toBuy, tokenPrice = price)
         helper.addEAU(buyer.address, costInEau)
@@ -126,6 +129,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
     @Test
     fun buyTokensWhenInitialLiquidityAuctionIsOver() {
         ownerCreatesVault()
+        ownerStake100Percent()
         ownerBreachesVault()
         val costInEau = getEauToBuyUserTokenAmount(toBuy)
         helper.addEAU(buyer.address, costInEau)
@@ -152,6 +156,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
         val initialSuppty = toTokenAmount(100)
         val price = toTokenAmount(2)
         ownerCreatesVault(initialAmount = initialSuppty, tokenPrice = price)
+        ownerStake100Percent(tokenInEau = price)
         val debtBefore = vaultByOwner.canBorrow().send()
         ownerBreachesVault()
         vaultByOwner.startInitialLiquidityAuction().send()
@@ -184,6 +189,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
     fun buyTokensToCoverBreachAfterTime() {
         val price = toTokenAmount(2)
         ownerCreatesVault(tokenPrice = price)
+        ownerStake100Percent(tokenInEau = price)
         val toBorrow = vaultByOwner.canBorrow().send()
         ownerBreachesVault()
         vaultByOwner.startInitialLiquidityAuction().send()
@@ -224,6 +230,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
         val costInEau = getEauToBuyUserTokenAmount(toBuy, tokenPrice = price)
         helper.addEAU(buyer.address, costInEau)
         ownerCreatesVault(initialAmount = toTokenAmount(8000), tokenPrice = price)
+        ownerStake100Percent(tokenInEau = price)
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
         // add CLGN to swap for penalty
@@ -247,6 +254,7 @@ class InitialLiquidityAuctionAcceptanceTest : AcceptanceTest() {
     @Test
     fun initialLiquidityAuctionIsOver() {
         ownerCreatesVault()
+        ownerStake100Percent()
         ownerBreachesVault()
         vaultByInitiator.startInitialLiquidityAuction().send()
         // set bit more time after auction has failed

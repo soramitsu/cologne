@@ -12,6 +12,7 @@ import org.web3j.crypto.Credentials
 import java.math.BigInteger
 import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 /**
  * Base class for acceptance tests
@@ -99,6 +100,14 @@ open class AcceptanceTest {
         stake(owner, stake)
     }
 
+    fun ownerStake100Percent(
+        tokenInEau: BigInteger = tokenPrice,
+        clgnInEau: BigInteger = toTokenAmount(helper.clgnEauPrice)
+    ) {
+        val toStake = vaultByOwner.tokenAmount.send() * tokenInEau / clgnInEau;
+        ownerStake(toStake)
+    }
+
     /**
      * @param amount to pay off in attoEAU
      */
@@ -117,8 +126,12 @@ open class AcceptanceTest {
         assertEquals(VaultState.Defaulted.toBigInteger(), vaultByOwner.state.send())
     }
 
+    fun toTokenAmount(amount: BigInteger, divider: Long = 1): BigInteger {
+        return ContractTestHelper.toTokenAmount(amount).div(BigInteger.valueOf(divider))
+    }
+
     fun toTokenAmount(amount: Long, divider: Long = 1): BigInteger {
-        return ContractTestHelper.toTokenAmount(BigInteger.valueOf(amount)).div(BigInteger.valueOf(divider))
+        return toTokenAmount(BigInteger.valueOf(amount), divider)
     }
 
     fun toPrettyBalance(balance: BigInteger): String {

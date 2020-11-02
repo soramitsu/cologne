@@ -127,6 +127,11 @@ interface IVault is IOwnable {
     function getTotalDebt() external view returns (uint);
 
     /**
+     * Update debt records
+     */
+    function updateDebt() external;
+
+    /**
      * Returns debt principal
      */
     function getPrincipal() external view returns (uint);
