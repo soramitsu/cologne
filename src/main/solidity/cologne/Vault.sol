@@ -33,26 +33,22 @@ contract Vault is IVault, Ownable {
     // Owner token price assessed by the owner in attoEAU (10^-18 EAU for 1 UserToken)
     uint _price = 0;
 
-    // current amount of stake (including slashing)
-    uint _stakeCurrent;
-
-    // stake deposited (wo slashing)
-    uint _stakedTotal;
-
-    // (address => stake) staked total by user
-    // actual stake by user = staked by user * _stakeCurrent / _stakedTotal
-    mapping(address => uint) _stakeByUser;
-    mapping(address => uint) _stakeRewardClaimedByUser;
-
     // Initial amount of loan without fees
     uint _principal = 0;
 
     uint _feeAccrued = 0;
 
-    // 50% of fees saved goes to co-stakeholders
-    uint _coStakerRewardAccrued = 0;
+    struct Stake {
+        bool stakeholder; // flag to show that address is recorded as stakeholder
+        uint stake; // stake amount by address in CLGN
+        uint rewardAccrued; // reward accrued for co-staking in EAU
+    }
 
-    uint _coStakerRewardStash = 0;
+    mapping(address => Stake) _stakeByUser;
+    address[] _stakeholders; // all stake holders
+    uint _coStakerRewardAccrued; // total reward for costakeholders
+    uint _stakeTotal; // amount staked by all stakeholders
+    uint _coStakerRewardStash;
 
     uint _debtUpdateTime;
 
@@ -132,24 +128,33 @@ contract Vault is IVault, Ownable {
         return address(_userToken);
     }
 
-    function stake(uint amount) notClosed public override {
-        _stake(amount);
+    function stake(uint clgnAmount) notClosed public override {
+        _clgnToken.safeTransferFrom(msg.sender, address(this), clgnAmount);
+        _updateDebt();
+        _stakeByUser[msg.sender].stake = _stakeByUser[msg.sender].stake.add(clgnAmount);
+        _stakeTotal = _stakeTotal.add(clgnAmount);
+        // add stakeholder to the list of stakeholders
+        if (!_stakeByUser[msg.sender].stakeholder) {
+            _stakeholders.push(msg.sender);
+            _stakeByUser[msg.sender].stakeholder = true;
+        }
     }
 
     // @dev See {IVault-getStake}
     function getStake(address account) public override view returns (uint) {
-        if (_stakedTotal == 0) return 0;
-        return _stakeByUser[account].mul(_stakeCurrent).div(_stakedTotal);
+        return _stakeByUser[account].stake;
     }
 
     // @dev See {IVault-getStakeReward}
-    function getStakeRewardAccrued(address stakeholder) public override view returns (uint) {
-        if (stakeholder == owner()) return 0;
-
-        uint totalReward;
-        (, totalReward,) = _calculateFeesAccrued(_timeProvider.getTime());
-        if (_stakeByUser[owner()] == _stakedTotal) return 0;
-        return totalReward.mul(_stakeByUser[stakeholder]).div(_stakedTotal.sub(_stakeByUser[owner()]));
+    function getStakeRewardAccrued(address stakeholder) public override view returns (uint reward) {
+        uint coStakerRewardOld;
+        (, coStakerRewardOld,) = _calculateFeesAccrued(_timeProvider.getTime());
+        uint coStake = _stakeTotal - _stakeByUser[owner()].stake;
+        if (coStake != 0) {
+            uint coStakerReward = _coStakerRewardAccrued - coStakerRewardOld;
+            reward = _stakeByUser[stakeholder].rewardAccrued + coStakerReward * _stakeByUser[stakeholder].stake / coStake;
+        }
+        return reward;
     }
 
     function getStakeRewardAccrued() public override view returns (uint reward) {
@@ -157,37 +162,37 @@ contract Vault is IVault, Ownable {
         return reward;
     }
 
-    function getStakeRewardToClaim(address stakeholder) public override view returns (uint reward) {
-        uint totalReward;
-        (, totalReward,) = _calculateFeesAccrued(_timeProvider.getTime());
-        if (totalReward == 0)
+    // @dev See {IVault-getStakeRewardToClaim}
+    function getStakeRewardToClaim(address stakeholder) public override view returns (uint) {
+        if (_coStakerRewardAccrued == 0) {
             return 0;
-
-        if (stakeholder == owner()) return 0;
-        if (_stakeByUser[owner()] == _stakedTotal) return 0;
-
-        return _coStakerRewardStash.mul(_stakeByUser[stakeholder]).div(_stakedTotal.sub(_stakeByUser[owner()])).sub(_stakeRewardClaimedByUser[stakeholder]);
+        }
+        return getStakeRewardAccrued(stakeholder) * _coStakerRewardStash / _coStakerRewardAccrued;
     }
 
     // @dev See {IVault-withdrawStakeReward}
-    function claimStakeReward(address stakeholder) public override returns (uint) {
+    function claimStakeReward(address toAddress) public override returns (uint) {
         _updateDebt();
 
         if (msg.sender == owner()) return 0;
 
-        uint reward = getStakeRewardToClaim(stakeholder);
-        _eauToken.safeTransfer(stakeholder, reward);
-        _stakeRewardClaimedByUser[stakeholder] = reward;
+        uint reward = getStakeRewardToClaim(msg.sender);
+        _eauToken.safeTransfer(toAddress, reward);
+        _stakeByUser[msg.sender].rewardAccrued -= reward;
+        _coStakerRewardStash -= reward;
+        _coStakerRewardAccrued -= reward;
         return reward;
     }
 
     // @dev See {IVault-withdrawStake}
-    function withdrawStake() closed public override returns (uint) {
+    function withdrawStake() public override returns (uint) {
+        require(!isOwner() || _closed, "Vault owner can unnstake only after the vault is closed");
+        claimStakeReward(msg.sender);
         uint toWithdraw = getStake(msg.sender);
         if (toWithdraw != 0) {
             _clgnToken.safeTransfer(msg.sender, toWithdraw);
         }
-        _stakeByUser[msg.sender] = 0;
+        _stakeByUser[msg.sender].stake = 0;
         return toWithdraw;
     }
 
@@ -293,11 +298,13 @@ contract Vault is IVault, Ownable {
     }
 
     function slash() notClosed notSlashed initialAuctionIsOver public override {
+        uint stakeTotalOld = _stakeTotal;
+
         // determine amount CLGN to sell
         uint debt = getTotalDebt();
         uint clgnToSell = _getClgnInForEauOut(debt);
-        if (clgnToSell > _stakeCurrent)
-            clgnToSell = _stakeCurrent;
+        if (clgnToSell > _stakeTotal)
+            clgnToSell = _stakeTotal;
 
         // distribute penalty
         uint penalty = clgnToSell.div(10);
@@ -308,16 +315,24 @@ contract Vault is IVault, Ownable {
         _clgnToken.safeTransfer(msg.sender, part);
         // remaining to burn
         _clgnToken.burn(penalty.sub(part.mul(2)));
-        _stakeCurrent -= penalty;
+        _stakeTotal -= penalty;
 
         // sell staked CLGN for EAU
-        if (clgnToSell > _stakeCurrent)
-            clgnToSell = _stakeCurrent;
+        if (clgnToSell > _stakeTotal)
+            clgnToSell = _stakeTotal;
         uint eauToBuy = _getEauOutForClgnIn(clgnToSell);
         if (eauToBuy > debt)
             eauToBuy = debt;
         uint eauLeftover = _sellClgnForEau(clgnToSell, eauToBuy);
-        _stakeCurrent -= clgnToSell;
+        _stakeTotal -= clgnToSell;
+
+        // reduce stakes
+        uint slashed = stakeTotalOld - _stakeTotal;
+        if (slashed != 0) {
+            for (uint i = 0; i < _stakeholders.length; i++) {
+                _stakeByUser[_stakeholders[i]].stake -= slashed * _stakeByUser[_stakeholders[i]].stake / stakeTotalOld;
+            }
+        }
 
         // pay off principal
         if (_principal <= eauLeftover) {
@@ -336,7 +351,7 @@ contract Vault is IVault, Ownable {
 
         // forgive fees
         _feeAccrued = 0;
-        //        _coStakerRewardAccrued = 0;
+        _coStakerRewardAccrued = 0;
         _slashed = true;
     }
 
@@ -483,7 +498,7 @@ contract Vault is IVault, Ownable {
      * Get CLGN collateral in EAU
      */
     function getCollateralInEau() public view override returns (uint) {
-        return _getEauOutForClgnIn(_stakeCurrent);
+        return _getEauOutForClgnIn(_stakeTotal);
     }
 
     function getState() public view override returns (VaultState) {
@@ -565,17 +580,6 @@ contract Vault is IVault, Ownable {
     }
 
     /**
-     * Adds CLGN to stake
-     */
-    function _stake(uint clgnAmount) private {
-        _clgnToken.safeTransferFrom(msg.sender, address(this), clgnAmount);
-        _updateDebt();
-        _stakeByUser[msg.sender] = _stakeByUser[msg.sender].add(clgnAmount);
-        _stakeCurrent = _stakeCurrent.add(clgnAmount);
-        _stakedTotal = _stakedTotal.add(clgnAmount);
-    }
-
-    /**
      * Get Dutch auction price
      * @return price
      */
@@ -592,7 +596,7 @@ contract Vault is IVault, Ownable {
     }
 
     /**
-     *
+     * Update fees accrued over period
      */
     function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint coStakerReward, uint limitBreachedTime) {
         require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
@@ -635,7 +639,18 @@ contract Vault is IVault, Ownable {
     function _updateDebt() internal {
         if (_debtUpdateTime == _timeProvider.getTime())
             return;
+        uint coStakerReward = _coStakerRewardAccrued;
         (_feeAccrued, _coStakerRewardAccrued, _limitBreachedTime) = _calculateFeesAccrued(_timeProvider.getTime());
+
+        // co-stake w/o owner (owner is not rewarded)
+        uint coStake = _stakeTotal - _stakeByUser[owner()].stake;
+        if (coStake != 0) {
+            // reward accrued for last period
+            coStakerReward = _coStakerRewardAccrued - coStakerReward;
+            for (uint i = 0; i < _stakeholders.length; i++) {
+                _stakeByUser[_stakeholders[i]].rewardAccrued += coStakerReward * _stakeByUser[_stakeholders[i]].stake / coStake;
+            }
+        }
         _debtUpdateTime = _timeProvider.getTime();
     }
 

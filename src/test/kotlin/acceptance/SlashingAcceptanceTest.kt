@@ -64,7 +64,7 @@ class SlashingAcceptanceTest : AcceptanceTest() {
         // slash
         vaultBySlasher.slash().send()
 
-        // current stake = initial stake (600) - debt (300) - panalty (10% = 30) = 270
+        // current stake = initial stake (600) - debt (300) - penalty (10% = 30) = 270
         // owner stake = 100 / 2 - 10% = 90
         // co-stakeholder stake = 100 / 2 -10% = 45
         val expectedOwnerStake = toTokenAmount(90)
@@ -123,8 +123,8 @@ class SlashingAcceptanceTest : AcceptanceTest() {
 
         vaultByCoStakeholder.claimStakeReward(coStakeholder.address).send()
 
-        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued(coStakeholder.address).send())
-        assertEquals(toTokenAmount(45, 100), vaultByOwner.getStakeRewardAccrued().send())
+        assertEquals(toTokenAmount(0), vaultByOwner.getStakeRewardAccrued(coStakeholder.address).send())
+        assertEquals(toTokenAmount(0), vaultByOwner.getStakeRewardAccrued().send())
         assertEquals(toTokenAmount(0), vaultByOwner.getStakeRewardToClaim(coStakeholder.address).send())
         assertEquals(toTokenAmount(0), vaultByOwner.fees.send())
         assertEquals(toTokenAmount(45, 100), eauToken.balanceOf(coStakeholder.address).send())

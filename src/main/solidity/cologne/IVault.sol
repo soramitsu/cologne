@@ -39,9 +39,9 @@ interface IVault is IOwnable {
 
     /**
      * Stake CLGN on Vault
-     * @param amount - amount of attoCLGN to stake
+     * @param clgnAmount - amount of attoCLGN to stake
      */
-    function stake(uint amount) external;
+    function stake(uint clgnAmount) external;
 
     /**
      * Get stake of a user in CLGN
@@ -67,14 +67,15 @@ interface IVault is IOwnable {
 
     /**
      * Withdraw reward for stake
-     * The vault owner will get nothing
+     * The vault owner not rewarded for stake
      * The stakeholder will receive reward as 50% of fees saved
+     * Only stakeholder can claim (msg.sender)
      */
-    function claimStakeReward(address stakeholder) external returns (uint);
+    function claimStakeReward(address toAddress) external returns (uint);
 
     /**
      * Withdraws stake
-     * Can be called only after the vault is closed.
+     * Vault owner can call only after the vault is closed.
      */
     function withdrawStake() external returns (uint);
 
