@@ -249,6 +249,11 @@ contract Vault is IVault, Ownable {
     }
 
     function payOff(uint amount) notClosed notSlashed public override {
+        _updateDebt();
+        uint debt = getTotalDebt();
+        if (debt < amount) {
+            amount = debt;
+        }
         _payOff(msg.sender, amount);
     }
 
@@ -298,6 +303,7 @@ contract Vault is IVault, Ownable {
     }
 
     function slash() notClosed notSlashed initialAuctionIsOver public override {
+        _updateDebt();
         uint stakeTotalOld = _stakeTotal;
 
         // determine amount CLGN to sell
@@ -599,7 +605,12 @@ contract Vault is IVault, Ownable {
      * Update fees accrued over period
      */
     function _calculateFeesAccrued(uint time) private view returns (uint feeAccrued, uint coStakerReward, uint limitBreachedTime) {
-        require(time >= _debtUpdateTime, "Cannot calculate fee in the past");
+        if (time == _debtUpdateTime) {
+            return (_feeAccrued, _coStakerRewardAccrued, _limitBreachedTime);
+        }
+
+        require(time > _debtUpdateTime, "Cannot calculate fee in the past");
+
         uint endTime = time;
         // Stop calculate fee when close-out process started
         if (_closeOutTime != 0 && _closeOutTime < time)

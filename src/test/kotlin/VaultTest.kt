@@ -146,7 +146,7 @@ class VaultTest : AcceptanceTest() {
     /**
      * @given The vault deployed with no debt
      * @when the user pays off 5000 EAU
-     * @then the vault balance increased by 5000 EAU
+     * @then the vault balance is 0 EAU, nothing is payed off
      */
     @Test
     fun payOffNoDebt() {
@@ -156,8 +156,8 @@ class VaultTest : AcceptanceTest() {
 
         ownerPaysOff(toPayOff)
 
-        assertEquals(toPayOff, eauToken.balanceOf(vaultByOwner.contractAddress).send())
-        assertEquals(BigInteger.ZERO, eauToken.balanceOf(owner.address).send())
+        assertEquals(BigInteger.ZERO, eauToken.balanceOf(vaultByOwner.contractAddress).send())
+        assertEquals(toPayOff, eauToken.balanceOf(owner.address).send())
     }
 
     /**
