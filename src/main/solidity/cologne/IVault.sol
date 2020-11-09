@@ -77,7 +77,7 @@ interface IVault is IOwnable {
      * Withdraws stake
      * Vault owner can call only after the vault is closed.
      */
-    function withdrawStake() external returns (uint);
+    function withdrawStake(uint toWithdraw) external;
 
     /**
      * @param amount of tokens to buy on atomic smallest part of token (e.g. 10^-18)

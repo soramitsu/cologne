@@ -185,15 +185,15 @@ contract Vault is IVault, Ownable {
     }
 
     // @dev See {IVault-withdrawStake}
-    function withdrawStake() public override returns (uint) {
-        require(!isOwner() || _closed, "Vault owner can unnstake only after the vault is closed");
+    function withdrawStake(uint toWithdraw) public override {
+        require(!isOwner() || _closed, "Vault owner can unstake only after the vault is closed");
         claimStakeReward(msg.sender);
-        uint toWithdraw = getStake(msg.sender);
+        uint stake = getStake(msg.sender);
+        require(toWithdraw <= stake, "Vault: withdraw stake. Amount too big");
         if (toWithdraw != 0) {
             _clgnToken.safeTransfer(msg.sender, toWithdraw);
         }
-        _stakeByUser[msg.sender].stake = 0;
-        return toWithdraw;
+        _stakeByUser[msg.sender].stake -= toWithdraw;
     }
 
     // @dev See {IVault-buy}
