@@ -5,9 +5,9 @@ export const ganacheAddresses = {
 };
 
 export const gorliAddresses = {
-  cologneDaoAddress: "0x893ade9859be78ef78fe7f52f63138e3a44bbbea",
-  userTokenAddress: "0x28c3afa4430aed6612083ac28658543dc48bb984",
-  timeProviderAddress: "0xbd25b57e3a95e42b0c8133af4c41a87bba23561d",
+  cologneDaoAddress: "0xa0230bc592afef6f6f52974de25bdd7c1dfc9d9a",
+  userTokenAddress: "0xf72e099c9838f328abfa7c3d2bcedd186f36dff0",
+  timeProviderAddress: "0x006f0d29713d5399fc2794a713d40612532f9e03",
 };
 
 export const networkMapper = (chainId) => {

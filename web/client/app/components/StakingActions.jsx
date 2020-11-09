@@ -1,6 +1,7 @@
 import {Dropdown, Table} from "semantic-ui-react";
 import React from "react";
 import StakeModal from "./Modals/StakeModal";
+import WithdrawStakeModal from "./Modals/WithdrawStakeModal";
 
 export default function StakingActions(props) {
   const {item} = props;
@@ -15,6 +16,7 @@ export default function StakingActions(props) {
       >
         <Dropdown.Menu>
           <StakeModal item={item} />
+          <WithdrawStakeModal item={item} />
         </Dropdown.Menu>
       </Dropdown>
     </Table.Cell>
